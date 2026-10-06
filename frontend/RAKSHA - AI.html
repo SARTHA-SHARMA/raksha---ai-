@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAKSHA AI v6 — AI Disaster Command & Decision Grid</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at top right,rgba(30,64,175,.16),transparent 35%),radial-gradient(circle at bottom left,rgba(127,29,29,.14),transparent 30%),#0f172a;color:#e2e8f0;font-family:Arial,sans-serif}button,select{font-family:inherit}
+/* Dark native dropdown fix — prevents white Windows/Chrome option menu */
+select{color-scheme:dark;background-color:#0f172a;color:#e2e8f0}
+select option{background-color:#0f172a!important;color:#e2e8f0!important}
+select option:checked,select option:hover{background-color:#334155!important;color:#fff!important}
+#regionSelect{color-scheme:dark;background-color:transparent!important;color:#e2e8f0!important}
+#regionSelect option{background:#0f172a!important;color:#e2e8f0!important}
+#langSelect{color-scheme:dark}
+button{transition:.18s ease}button:hover{transform:translateY(-1px)}button:active{transform:translateY(0)}
+header{backdrop-filter:blur(16px);background:rgba(15,23,42,.96)}header h1{letter-spacing:.08em}
+.dashboard-card{background:linear-gradient(145deg,rgba(30,41,59,.97),rgba(15,23,42,.97));border:1px solid #334155;border-radius:14px;transition:transform .2s,box-shadow .2s}.dashboard-card:hover{transform:translateY(-2px);box-shadow:0 15px 40px rgba(0,0,0,.25)}
+#map{height:480px;min-height:400px;border-radius:14px;overflow:hidden;border:1px solid #334155;box-shadow:inset 0 0 30px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.15)}
+.leaflet-container{font-family:Arial,sans-serif}.leaflet-tooltip.safe-tooltip{background:#052e1b;color:#a7f3d0;border:1px solid #10b981;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,.4)}.leaflet-tooltip.safe-tooltip:before{border-top-color:#10b981}
+.alert-banner{position:relative;overflow:hidden}.alert-banner:before{content:"";position:absolute;left:0;top:0;width:4px;height:100%;background:#ef4444;box-shadow:0 0 15px rgba(239,68,68,.9)}
+.live{color:#34d399;animation:liveBlink 2s infinite}@keyframes liveBlink{0%,100%{opacity:1}50%{opacity:.5}}
+.siren-active{animation:sirenFlash .5s infinite alternate}@keyframes sirenFlash{from{box-shadow:0 0 10px rgba(239,68,68,.3)}to{box-shadow:0 0 35px rgba(239,68,68,.9)}}
+#notification{position:fixed;right:25px;bottom:25px;width:360px;background:#1e293b;border:1px solid #475569;border-left:4px solid #ef4444;border-radius:10px;padding:15px;box-shadow:0 20px 40px rgba(0,0,0,.4);transform:translateX(450px);transition:transform .3s ease;z-index:9999}#notification.show{transform:translateX(0)}
+#modalBackdrop{position:fixed;inset:0;background:rgba(2,6,23,.75);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;z-index:10000;padding:20px}.modal{width:min(560px,100%);background:#0f172a;border:1px solid #475569;border-radius:16px;box-shadow:0 25px 80px rgba(0,0,0,.55)}
+#riskGauge{transition:background .5s ease}#aiRiskValue{animation:riskPulse 2s infinite}@keyframes riskPulse{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.05);opacity:1}}
+.progress{height:7px;background:#1e293b;border-radius:999px;overflow:hidden}.progress>span{display:block;height:100%;border-radius:999px;transition:width .5s ease}.citizen-mode .admin-only{display:none!important}.citizen-mode .citizen-focus{box-shadow:0 0 35px rgba(59,130,246,.2);border-color:rgba(59,130,246,.5)}
+.citizen-mode #map{height:520px}.route-glow{filter:drop-shadow(0 0 7px rgba(52,211,153,.9))}.map-badge{background:#052e1b;color:#a7f3d0;border:1px solid #10b981;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:700}
+@media(max-width:768px){#map,.citizen-mode #map{height:330px;min-height:330px}#notification{width:calc(100% - 30px);right:15px;bottom:15px}.desktop-only{display:none!important}}
+@media(min-width:1024px){main{padding-top:1.25rem;padding-bottom:1.25rem}.small-text{font-size:11px}}
+
+/* v6 decision-intelligence upgrades */
+.kpi-card{position:relative;overflow:hidden}
+.kpi-card:after{content:"";position:absolute;inset:auto -30px -40px auto;width:120px;height:120px;border-radius:50%;background:rgba(59,130,246,.06);pointer-events:none}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+.status-dot.ok{background:#34d399;box-shadow:0 0 10px rgba(52,211,153,.8)}
+.status-dot.warn{background:#fbbf24;box-shadow:0 0 10px rgba(251,191,36,.7)}
+.status-dot.danger{background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,.8)}
+.metric-note{font-size:9px;color:#64748b;margin-top:3px}
+.decision-pill{font-size:9px;padding:4px 7px;border-radius:999px;border:1px solid #334155;background:#0f172a}
+.sensor-marker{background:#06b6d4;border:2px solid #e0f2fe;border-radius:50%;width:12px;height:12px;box-shadow:0 0 0 5px rgba(6,182,212,.15),0 0 14px rgba(6,182,212,.75)}
+.shelter-marker{background:#10b981;border:2px solid #ecfdf5;border-radius:4px;width:13px;height:13px;box-shadow:0 0 12px rgba(16,185,129,.7)}
+.layer-chip{cursor:pointer;user-select:none}
+.layer-chip.active{background:rgba(6,182,212,.12);border-color:rgba(6,182,212,.4);color:#67e8f9}
+@media(max-width:768px){.kpi-card strong{font-size:1.15rem}.decision-grid{grid-template-columns:1fr!important}}
+
+
+/* ================= RAKSHA AI v6 — Advanced Decision Intelligence ================= */
+.v6-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:1rem}
+.v6-panel{background:linear-gradient(145deg,rgba(15,23,42,.98),rgba(30,41,59,.94));border:1px solid #334155;border-radius:14px;padding:1rem}
+.hazard-card{position:relative;overflow:hidden}
+.hazard-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#64748b}
+.hazard-card.critical:before{background:#ef4444;box-shadow:0 0 18px rgba(239,68,68,.8)}
+.hazard-card.high:before{background:#f97316}
+.hazard-card.moderate:before{background:#f59e0b}
+.hazard-card.low:before{background:#10b981}
+.big-risk{font-size:2rem;font-weight:800;letter-spacing:-.04em}
+.mini-stat{background:rgba(2,6,23,.55);border:1px solid #334155;border-radius:10px;padding:.65rem}
+.scenario-slider{width:100%;accent-color:#a855f7;cursor:pointer}
+.scenario-value{font-variant-numeric:tabular-nums}
+.route-option{transition:.18s ease;cursor:pointer}
+.route-option:hover{transform:translateY(-2px);border-color:#34d399}
+.route-option.selected{border-color:#34d399;background:rgba(16,185,129,.08);box-shadow:0 0 22px rgba(16,185,129,.08)}
+.sim-step{opacity:.35;transform:translateX(-8px);transition:.35s ease}
+.sim-step.active{opacity:1;transform:translateX(0)}
+.sim-step.done{opacity:1}
+.sim-dot{width:10px;height:10px;border-radius:50%;background:#475569;display:inline-block;box-shadow:0 0 0 4px rgba(71,85,105,.12)}
+.sim-step.active .sim-dot{background:#a855f7;box-shadow:0 0 0 5px rgba(168,85,247,.15),0 0 16px rgba(168,85,247,.7)}
+.sim-step.done .sim-dot{background:#34d399}
+.alert-strip{background:linear-gradient(90deg,rgba(127,29,29,.35),rgba(30,41,59,.2));border:1px solid rgba(239,68,68,.25)}
+.spark{height:7px;background:#1e293b;border-radius:999px;overflow:hidden}
+.spark>span{display:block;height:100%;border-radius:999px;transition:width .45s ease}
+.ai-explain{background:rgba(88,28,135,.08);border:1px solid rgba(168,85,247,.2)}
+@media(max-width:1024px){.v6-grid{grid-template-columns:1fr}.v6-panel{grid-column:span 1!important}}
+
+
+/* ================= RAKSHA AI USER LOGIN ================= */
+body.auth-locked > header, body.auth-locked > section, body.auth-locked > main, body.auth-locked > footer, body.auth-locked > #notification, body.auth-locked > #modalBackdrop{visibility:hidden;pointer-events:none}
+#loginScreen{position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 20% 20%,rgba(239,68,68,.18),transparent 30%),radial-gradient(circle at 80% 80%,rgba(37,99,235,.2),transparent 35%),#020617}
+.login-shell{width:min(430px,100%);background:linear-gradient(145deg,rgba(15,23,42,.98),rgba(30,41,59,.98));border:1px solid #334155;border-radius:20px;box-shadow:0 30px 100px rgba(0,0,0,.6);padding:28px}
+.login-logo{width:64px;height:64px;margin:0 auto 14px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f97316,#dc2626);box-shadow:0 12px 35px rgba(220,38,38,.3)}
+.login-input{width:100%;background:#020617;border:1px solid #334155;border-radius:10px;padding:12px 13px;color:#e2e8f0;outline:none;font-size:13px}
+.login-input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.login-role{flex:1;border:1px solid #334155;background:#0f172a;color:#94a3b8;border-radius:10px;padding:10px;font-size:11px;font-weight:700;cursor:pointer}
+.login-role.active{border-color:#3b82f6;background:rgba(59,130,246,.12);color:#93c5fd}
+.login-error{display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:9px;padding:9px;font-size:11px}
+#loginUserBadge{display:flex;align-items:center;gap:7px}
+#logoutButton{background:#7f1d1d;border:1px solid #991b1b;color:#fecaca;padding:7px 10px;border-radius:8px;font-size:10px;font-weight:700}
+</style>
+</head>
+<body class="min-h-screen flex flex-col auth-locked">
+<div id="loginScreen">
+  <div class="login-shell">
+    <div class="login-logo"><i data-lucide="shield-check" class="w-9 h-9 text-white"></i></div>
+    <div class="text-center mb-6">
+      <h2 class="text-2xl font-extrabold text-white tracking-wide">RAKSHA AI</h2>
+      <p class="text-xs text-slate-400 mt-1">Secure Disaster Response Command Portal</p>
+    </div>
+    <form onsubmit="handleRakshaLogin(event)">
+      <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-2">Username</label>
+      <input id="loginUsername" class="login-input mb-4" placeholder="Enter username" autocomplete="username" required>
+      <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-2">Password</label>
+      <input id="loginPassword" type="password" class="login-input mb-4" placeholder="Enter password" autocomplete="current-password" required>
+      <label class="block text-[10px] uppercase tracking-wider text-slate-400 mb-2">Access Role</label>
+      <div class="flex gap-2 mb-4">
+        <button type="button" id="roleAdmin" class="login-role active" onclick="selectLoginRole('admin')">🛡️ ADMIN</button>
+        <button type="button" id="roleCitizen" class="login-role" onclick="selectLoginRole('citizen')">📱 CITIZEN</button>
+      </div>
+      <div id="loginError" class="login-error mb-3">Invalid login credentials.</div>
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2">
+        <i data-lucide="log-in" class="w-4 h-4"></i> SIGN IN TO RAKSHA AI
+      </button>
+    </form>
+    <div class="mt-5 pt-4 border-t border-slate-700 text-[9px] text-slate-500 text-center">Demo access: <b>admin / raksha123</b> or <b>citizen / citizen123</b></div>
+  </div>
+</div>
+
+
+<header class="border-b border-slate-700 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
+  <div class="flex items-center gap-3">
+    <div class="relative w-11 h-11 rounded-xl flex items-center justify-center text-white bg-gradient-to-br from-orange-500 to-red-600 shadow-lg shadow-red-900/30">
+      <i data-lucide="shield-check" class="w-6 h-6"></i>
+      <span class="absolute -right-1 -bottom-1 w-4 h-4 rounded-full bg-emerald-400 border-2 border-slate-900"></span>
+    </div>
+    <div><h1 class="text-xl font-bold text-white">RAKSHA AI</h1><p class="text-xs text-slate-400">Intelligent Multi-Region Disaster Prediction & Relief Grid</p></div>
+  </div>
+
+  <div class="flex items-center gap-3 flex-wrap">
+    <div class="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-3 py-2">
+      <i data-lucide="search" class="w-4 h-4 text-slate-400 mr-2"></i>
+      <select id="regionSelect" onchange="changeRegion()" class="bg-transparent text-sm text-slate-200 focus:outline-none max-w-[270px]"></select>
+    </div>
+    <button id="headerModeButton" onclick="toggleCitizenMode()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2"><i data-lucide="smartphone" class="w-4 h-4"></i> CITIZEN MODE</button>
+    <div class="bg-red-500/10 border border-red-500/30 text-red-400 px-3 py-2 rounded-lg flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span><span id="activeSectorBadge" class="text-xs font-bold">JOSHIMATH: HIGH RISK</span></div>
+  </div>
+</header>
+
+<section class="alert-banner bg-red-950/40 border-b border-red-500/30 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+  <div class="flex items-center gap-2"><i data-lucide="waves" class="w-5 h-5 text-red-400"></i><span class="font-bold text-red-400">AI River Flow Alert:</span><span id="riverSurgeText" class="text-xs text-red-200"></span></div>
+  <button onclick="broadcastAlert()" class="bg-red-600 hover:bg-red-500 text-white text-xs px-4 py-2 rounded-lg font-semibold flex items-center gap-2"><i data-lucide="radio" class="w-4 h-4"></i> Broadcast Alert</button>
+</section>
+
+<div class="px-6 pt-4">
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+    <div class="dashboard-card kpi-card p-4"><span class="text-[10px] uppercase tracking-wider text-slate-500">AI Decision Risk</span><strong id="topThreat" class="block text-xl text-orange-400 mt-1">79%</strong><span id="topThreatLabel" class="text-[10px] text-orange-300">● AI + operational assessment</span><div id="riskConsistency" class="metric-note">Model + environment aligned</div></div>
+    <div class="dashboard-card kpi-card p-4"><span class="text-[10px] uppercase tracking-wider text-slate-500">Population at Risk</span><strong id="topPopulation" class="block text-xl text-white mt-1">35,700</strong><span class="text-[10px] text-slate-500">Across priority sub-zones</span><div id="topHazard" class="metric-note">Hazard: FLASH FLOOD + LANDSLIDE</div></div>
+    <div class="dashboard-card kpi-card p-4"><span class="text-[10px] uppercase tracking-wider text-slate-500">Evacuation Window</span><strong id="topEvac" class="block text-xl text-amber-400 mt-1">41 min</strong><span class="text-[10px] text-slate-500">Modelled response window</span><div id="impactHorizon" class="metric-note">Impact horizon: ~45 min</div></div>
+    <div class="dashboard-card kpi-card p-4"><span class="text-[10px] uppercase tracking-wider text-slate-500">Data Consistency</span><strong id="topConfidence" class="block text-xl text-cyan-300 mt-1">94%</strong><span class="text-[10px] text-slate-500">Prototype confidence indicator</span><div class="metric-note">Not a probability of correctness</div></div>
+    <div class="dashboard-card kpi-card p-4"><span class="text-[10px] uppercase tracking-wider text-slate-500">System Status</span><strong id="systemStatus" class="block text-xl text-emerald-400 mt-1">LOCAL READY</strong><span class="text-[10px] text-slate-500">Frontend + local model</span><div id="backendStatus" class="metric-note">Backend: optional / offline</div></div>
+  </div>
+  <div class="dashboard-card mt-3 p-4">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <div><span class="text-xs font-bold text-cyan-300">LIVE AREA DATA</span><span id="liveFeedStatus" class="ml-2 text-[10px] text-amber-300">● CONNECTING…</span></div>
+      <span id="liveUpdatedAt" class="text-[10px] text-slate-500">Waiting for current feed</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 text-[10px]">
+      <div class="mini-stat"><span class="text-slate-500 block">Temperature</span><b id="liveTemp">--</b></div>
+      <div class="mini-stat"><span class="text-slate-500 block">Humidity</span><b id="liveHumidity">--</b></div>
+      <div class="mini-stat"><span class="text-slate-500 block">Rain • 24h</span><b id="liveRain24">--</b></div>
+      <div class="mini-stat"><span class="text-slate-500 block">Wind</span><b id="liveWind">--</b></div>
+      <div class="mini-stat"><span class="text-slate-500 block">Cloud cover</span><b id="liveCloud">--</b></div>
+      <div class="mini-stat"><span class="text-slate-500 block">Soil moisture</span><b id="liveSoil">--</b></div>
+      <div class="mini-stat"><span class="text-slate-500 block">PM2.5</span><b id="livePM25">--</b></div>
+      <div class="mini-stat"><span class="text-slate-500 block">US AQI</span><b id="liveAQI">--</b></div>
+    </div>
+    <div class="mt-2 flex flex-wrap justify-between gap-2 text-[9px] text-slate-500"><span id="liveSourceText">Weather: Open-Meteo • Air quality: CAMS via Open-Meteo</span><span>River gauges / rescue inventory remain unverified unless an official sensor API is connected.</span></div>
+  </div>
+</div>
+
+<main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+  <section class="lg:col-span-7 flex flex-col gap-6">
+    <div class="dashboard-card p-4">
+      <div class="flex justify-between items-center mb-3"><h2 id="mapTitle" class="font-semibold flex items-center gap-2"><i data-lucide="map-pin" class="w-5 h-5 text-blue-400"></i> GIS Hazard Map</h2><span class="text-xs text-emerald-400 live">● GIS ACTIVE</span></div>
+      <div class="relative"><div id="map"></div><div class="absolute top-3 right-3 z-[500] map-badge">LIVE GIS • SATELLITE</div><div class="absolute bottom-3 left-3 z-[500] flex flex-wrap gap-1"><button class="layer-chip decision-pill active" data-layer="risk" onclick="toggleMapLayer('risk')">Risk</button><button class="layer-chip decision-pill active" data-layer="sensors" onclick="toggleMapLayer('sensors')">Sensors</button><button class="layer-chip decision-pill active" data-layer="shelters" onclick="toggleMapLayer('shelters')">Shelters</button><button class="layer-chip decision-pill" data-layer="route" onclick="toggleMapLayer('route')">Route</button></div></div>
+      <div class="flex flex-wrap justify-between gap-3 mt-3 pt-3 border-t border-slate-700 text-xs text-slate-400">
+        <div class="flex gap-4"><span>🔴 High Risk</span><span>🟢 Safe Zone</span><span>🔵 Sensor</span><span>━ Evacuation Corridor</span></div><span class="text-cyan-300">Satellite GIS • live weather/environment feeds</span>
+      </div>
+    </div>
+
+    <div class="dashboard-card p-5 admin-only">
+      <h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i> High Vulnerability Sub-Zones</h3>
+      <div id="zoneGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+    </div>
+
+    <div class="dashboard-card p-5 admin-only">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-sm font-semibold flex items-center gap-2"><i data-lucide="truck" class="w-4 h-4 text-cyan-400"></i> Rescue Fleet & Vehicle Allocation</h3><span class="text-[9px] text-slate-500">SIMULATED INVENTORY</span></div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-slate-900/60 border border-slate-700 p-4 rounded-lg text-center"><i data-lucide="ambulance" class="w-6 h-6 text-red-400 mx-auto mb-2"></i><p class="text-xs">Ambulances</p><strong id="ambulanceCount" class="text-emerald-400">14 / 18</strong></div>
+        <div class="bg-slate-900/60 border border-slate-700 p-4 rounded-lg text-center"><i data-lucide="anchor" class="w-6 h-6 text-cyan-400 mx-auto mb-2"></i><p class="text-xs">Rescue Boats</p><strong id="boatCount" class="text-emerald-400">22 / 25</strong></div>
+        <div class="bg-slate-900/60 border border-slate-700 p-4 rounded-lg text-center"><i data-lucide="plane" class="w-6 h-6 text-amber-400 mx-auto mb-2"></i><p class="text-xs">Air Choppers</p><strong id="chopperCount" class="text-amber-400">3 Standby</strong></div>
+      </div>
+    </div>
+
+    <div class="dashboard-card p-5 admin-only">
+      <div class="flex justify-between items-center mb-4"><div><h3 class="text-sm font-semibold flex items-center gap-2"><i data-lucide="package-check" class="w-4 h-4 text-cyan-400"></i> Field Resource Readiness</h3><p class="text-[10px] text-slate-500">Operational inventory available for immediate dispatch</p></div><span class="text-[9px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">SIMULATED INVENTORY</span></div>
+      <div class="grid grid-cols-2 gap-3" id="resourceGrid"></div>
+      <div id="resourceDecision" class="mt-3 text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">AI priority: calculate dispatch package from current risk and resource readiness.</div>
+      <button onclick="dispatchResponsePackage()" class="w-full mt-3 bg-blue-600 hover:bg-blue-500 py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2"><i data-lucide="send" class="w-4 h-4"></i> DISPATCH RESPONSE PACKAGE</button>
+      <p id="dispatchStatus" class="text-[10px] text-slate-500 text-center mt-2">Awaiting dispatch decision</p>
+    </div>
+  </section>
+
+  <section class="lg:col-span-5 flex flex-col gap-6">
+    <div class="dashboard-card p-5 admin-only">
+      <div class="flex justify-between mb-3"><div><h2 class="font-semibold flex items-center gap-2"><i data-lucide="cpu" class="w-5 h-5 text-purple-400"></i> Predictive Risk Engine</h2><p class="text-xs text-slate-400">ML signal projection vs baseline • deterministic local inference</p></div><span class="text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/30 px-2 py-1 rounded">XGBOOST v1.0</span></div>
+      <div style="height:210px"><canvas id="mlGraph"></canvas></div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <button onclick="adjustScenario(-10)" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded text-[10px]">RAIN −</button>
+        <button onclick="resetScenario()" class="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 px-3 py-1.5 rounded text-[10px]">BASE SCENARIO</button>
+        <button onclick="adjustScenario(10)" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded text-[10px]">RAIN +</button>
+        <span id="scenarioBadge" class="ml-auto text-[10px] text-cyan-300 px-2 py-1.5">SCENARIO: BASE</span>
+      </div>
+      <div class="mt-3 grid grid-cols-2 gap-2 text-[10px]"><div class="bg-slate-900/60 p-2 rounded border border-slate-700"><span class="text-slate-500 block">Model</span><b>XGBoost Regressor</b></div><div class="bg-slate-900/60 p-2 rounded border border-slate-700"><span class="text-slate-500 block">Training set</span><b>10,010 prototype records</b></div><div class="bg-slate-900/60 p-2 rounded border border-slate-700"><span class="text-slate-500 block">Validation R²</span><b>0.62</b></div><div class="bg-slate-900/60 p-2 rounded border border-slate-700"><span class="text-slate-500 block">Inference</span><b>&lt; 5 ms local</b></div></div>
+    </div>
+
+    <div class="dashboard-card p-5 admin-only">
+      <div class="flex justify-between items-center mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><i data-lucide="users" class="w-4 h-4 text-blue-400"></i> Active Personnel</h3><button onclick="openReinforcementModal()" class="bg-blue-600 hover:bg-blue-500 text-xs px-3 py-1.5 rounded flex items-center gap-2"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i> Call Reinforcements</button></div>
+      <div class="space-y-2 text-xs"><div class="bg-slate-900/50 border border-slate-700 rounded-lg p-3 flex justify-between"><span>NDRF & SDRF Forces</span><strong>240 On Duty</strong></div><div class="bg-slate-900/50 border border-slate-700 rounded-lg p-3 flex justify-between"><span>Local Volunteers</span><strong>185 Active</strong></div></div>
+    </div>
+
+    <div class="dashboard-card p-5 admin-only"><h3 class="text-sm font-semibold mb-4 flex items-center gap-2"><i data-lucide="home" class="w-4 h-4 text-emerald-400"></i> Relief Camps Capacity</h3><div id="campGrid"></div></div>
+
+    <div id="broadcastCard" class="dashboard-card p-5 admin-only">
+      <div class="flex justify-between items-center mb-3"><h3 class="text-sm font-semibold flex items-center gap-2"><i data-lucide="globe" class="w-4 h-4 text-amber-400"></i> Multilingual Broadcast Alert</h3><select id="langSelect" onchange="updateLanguageMessage()" class="bg-slate-900 border border-slate-700 text-xs text-amber-300 rounded px-2 py-1"><option value="en">English</option><option value="hi">Hindi</option><option value="gar">Garhwali</option><option value="kum">Kumaoni</option></select></div>
+      <textarea id="alertTextArea" rows="3" readonly class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-slate-200 resize-none"></textarea>
+      <div class="grid grid-cols-2 gap-2 mt-3"><button onclick="connectPhoneAlert()" class="bg-cyan-600 hover:bg-cyan-500 py-2 rounded-lg text-[10px] font-bold">📱 CONNECT PHONE</button><span id="phoneStatus" class="bg-slate-900 border border-slate-700 rounded-lg flex items-center justify-center text-[10px] text-slate-400">PHONE BRIDGE: READY</span></div>
+      <button id="broadcastButton" onclick="broadcastAlert()" class="w-full bg-red-600 hover:bg-red-500 text-white text-xs py-3 rounded-lg font-semibold mt-3 flex items-center justify-center gap-2"><i data-lucide="radio" class="w-4 h-4"></i> BROADCAST REGIONAL ALERT</button>
+    </div>
+  </section>
+
+  <section class="lg:col-span-12 dashboard-card p-5 admin-only">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5"><div><div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span><h2 class="text-lg font-bold">AI COMMAND CENTER</h2><span class="text-[10px] px-2 py-1 rounded bg-purple-500/10 text-purple-300 border border-purple-500/30">DECISION INTELLIGENCE</span></div><p class="text-xs text-slate-400 mt-1">Predict → Prioritize → Respond → Protect</p></div><button onclick="runAIAnalysis()" class="bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2"><i data-lucide="brain-circuit" class="w-4 h-4"></i> RUN AI ANALYSIS</button></div>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div class="bg-slate-950/60 border border-red-500/20 rounded-xl p-4"><p id="riskCardTitle" class="text-[10px] uppercase tracking-wider text-slate-400">AI Decision Risk</p><div id="riskGauge" class="relative w-32 h-32 mx-auto my-3 rounded-full flex items-center justify-center"><div class="w-24 h-24 rounded-full bg-slate-900 flex flex-col items-center justify-center"><strong id="aiRiskValue" class="text-3xl text-red-400">79%</strong><span id="aiRiskLevel" class="text-[9px] font-bold text-red-400">HIGH</span></div></div><div class="grid grid-cols-2 gap-2 text-[10px]"><div class="bg-slate-800 p-2 rounded"><span class="text-slate-500 block">Rainfall</span><strong id="riskRain">185 mm</strong></div><div class="bg-slate-800 p-2 rounded"><span class="text-slate-500 block">Soil</span><strong id="riskSoil">86%</strong></div></div></div>
+      <div class="bg-slate-950/60 border border-purple-500/20 rounded-xl p-4 md:col-span-1 xl:col-span-2"><div class="flex items-center gap-2 mb-3"><i data-lucide="brain" class="w-4 h-4 text-purple-400"></i><h3 class="text-sm font-bold">AI Recommended Action</h3></div><div id="aiRecommendation" class="space-y-2 text-xs"></div><div class="mt-4 pt-3 border-t border-slate-700 flex justify-between text-[10px]"><span class="text-slate-500">Estimated evacuation window</span><strong class="text-amber-400" id="evacWindow">37 MIN</strong></div></div>
+      <div class="bg-slate-950/60 border border-cyan-500/20 rounded-xl p-4"><div class="flex items-center gap-2 mb-3"><i data-lucide="radio-tower" class="w-4 h-4 text-cyan-400"></i><h3 class="text-sm font-bold">Data Fusion</h3></div><div class="space-y-2 text-[10px]"><div class="flex justify-between"><span>Weather</span><b class="text-emerald-400">● SIM</b></div><div class="flex justify-between"><span>River Sensors</span><b class="text-emerald-400">● SIM</b></div><div class="flex justify-between"><span>GIS / Maps</span><b class="text-emerald-400">● ACTIVE</b></div><div class="flex justify-between"><span>Population</span><b class="text-emerald-400">● DATA</b></div><div class="flex justify-between"><span>Historical Data</span><b class="text-emerald-400">● DATA</b></div></div><div class="mt-4 bg-cyan-500/10 border border-cyan-500/20 rounded p-2 text-center"><span class="text-[9px] text-slate-400 block">AI CONFIDENCE</span><strong id="commandConfidence" class="text-cyan-300 text-xl">94%</strong></div></div>
+      <div class="bg-slate-950/60 border border-amber-500/20 rounded-xl p-4"><div class="flex items-center gap-2 mb-3"><i data-lucide="clock-3" class="w-4 h-4 text-amber-400"></i><h3 class="text-sm font-bold">Incident Timeline</h3></div><div id="incidentTimeline" class="space-y-2 text-[10px]"></div></div>
+    </div>
+  </section>
+
+  <section class="lg:col-span-12 admin-only">
+    <div class="dashboard-card p-5"><div class="flex justify-between items-center mb-4"><div><h3 class="text-sm font-bold flex items-center gap-2"><i data-lucide="brain-circuit" class="w-4 h-4 text-purple-400"></i> Model Explainability</h3><p class="text-[10px] text-slate-500">Why the model is flagging this sector — learned XGBoost feature importance + operational modifiers</p></div><span class="text-[9px] bg-purple-500/10 text-purple-300 border border-purple-500/30 px-2 py-1 rounded">XGBOOST FEATURE IMPORTANCE</span></div><div id="featureBars" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4"></div><div class="grid grid-cols-4 gap-2 mt-4 text-center text-[10px]"><div class="border border-slate-700 rounded-lg p-3"><b>DETECT</b><span class="block text-slate-500 mt-1">Sensor anomaly</span></div><div class="border border-slate-700 rounded-lg p-3"><b>ASSESS</b><span class="block text-slate-500 mt-1">Risk fusion</span></div><div class="border border-slate-700 rounded-lg p-3"><b>PRIORITIZE</b><span class="block text-slate-500 mt-1">Zone ranking</span></div><div class="border border-slate-700 rounded-lg p-3"><b>RESPOND</b><span class="block text-slate-500 mt-1">Action plan</span></div></div></div>
+  </section>
+
+  <section class="lg:col-span-12 admin-only">
+    <div class="dashboard-card p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div><h3 class="text-sm font-bold flex items-center gap-2"><i data-lucide="list-checks" class="w-4 h-4 text-cyan-400"></i> Response Decision Board</h3><p class="text-[10px] text-slate-500">Risk ranking, model contribution and operational response in one view</p></div>
+        <span class="decision-pill text-cyan-300">DECISION LOOP • SENSE → PREDICT → PRIORITIZE → RESPOND</span>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-slate-950/60 border border-red-500/20 rounded-xl p-4">
+          <div class="flex justify-between items-center mb-3"><h4 class="text-xs font-bold">Priority Zones</h4><span class="text-[9px] text-slate-500">AUTO-RANKED</span></div>
+          <div id="priorityBoard" class="space-y-2"></div>
+        </div>
+        <div class="bg-slate-950/60 border border-purple-500/20 rounded-xl p-4">
+          <div class="flex justify-between items-center mb-3"><h4 class="text-xs font-bold">Risk Composition</h4><span id="riskFormulaBadge" class="text-[9px] text-purple-300">PROTOTYPE CALIBRATION</span></div>
+          <div id="riskBreakdown" class="space-y-3"></div>
+        </div>
+        <div class="bg-slate-950/60 border border-cyan-500/20 rounded-xl p-4">
+          <div class="flex justify-between items-center mb-3"><h4 class="text-xs font-bold">Model Diagnostics</h4><span class="text-[9px] text-slate-500">HONEST STATUS</span></div>
+          <div id="modelDiagnostics" class="space-y-2 text-[10px]"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  
+  <!-- ================= v6 ADVANCED DECISION INTELLIGENCE ================= -->
+  <section class="lg:col-span-12 admin-only">
+    <div class="v6-panel">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></span>
+            <h2 class="text-lg font-bold">AI THREAT INTELLIGENCE MATRIX</h2>
+            <span class="decision-pill text-purple-300">v6 • MULTI-HAZARD</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Flood + landslide + evacuation exposure • deterministic decision engine</p>
+        </div>
+        <button onclick="runEmergencySimulation()" class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2">
+          <i data-lucide="play-circle" class="w-4 h-4"></i> RUN EMERGENCY SIMULATION
+        </button>
+      </div>
+
+      <div id="hazardMatrix" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"></div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div class="lg:col-span-2 mini-stat">
+          <div class="flex justify-between items-center mb-3">
+            <div>
+              <h3 class="text-sm font-bold">WHY THIS ALERT?</h3>
+              <p class="text-[10px] text-slate-500">Human-readable AI decision explanation</p>
+            </div>
+            <span id="primaryDriverBadge" class="decision-pill text-purple-300">PRIMARY DRIVER</span>
+          </div>
+          <div id="aiExplanation" class="ai-explain rounded-lg p-3 text-xs space-y-2"></div>
+        </div>
+        <div class="mini-stat">
+          <h3 class="text-sm font-bold mb-3">DECISION SNAPSHOT</h3>
+          <div id="decisionSnapshot" class="space-y-2 text-[10px]"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lg:col-span-12 admin-only">
+    <div class="v6-panel">
+      <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+        <div>
+          <h3 class="text-sm font-bold flex items-center gap-2">
+            <i data-lucide="flask-conical" class="w-4 h-4 text-purple-400"></i> AI SCENARIO LAB
+          </h3>
+          <p class="text-[10px] text-slate-500">Stress-test the disaster response plan before conditions worsen</p>
+        </div>
+        <span id="scenarioSeverity" class="decision-pill text-cyan-300">BASELINE</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="mini-stat">
+          <div class="flex justify-between text-[10px] mb-2"><span>Rainfall</span><b id="scenarioRainValue" class="scenario-value">+0 mm</b></div>
+          <input id="scenarioRainSlider" class="scenario-slider" type="range" min="-40" max="60" value="0" step="5" oninput="updateAdvancedScenario()">
+          <div class="flex justify-between text-[9px] text-slate-600 mt-1"><span>-40</span><span>+60 mm</span></div>
+        </div>
+        <div class="mini-stat">
+          <div class="flex justify-between text-[10px] mb-2"><span>River level</span><b id="scenarioRiverValue" class="scenario-value">+0.0 m</b></div>
+          <input id="scenarioRiverSlider" class="scenario-slider" type="range" min="-10" max="15" value="0" step="1" oninput="updateAdvancedScenario()">
+          <div class="flex justify-between text-[9px] text-slate-600 mt-1"><span>-1.0m</span><span>+1.5m</span></div>
+        </div>
+        <div class="mini-stat">
+          <div class="flex justify-between text-[10px] mb-2"><span>Soil saturation</span><b id="scenarioSoilValue" class="scenario-value">+0%</b></div>
+          <input id="scenarioSoilSlider" class="scenario-slider" type="range" min="-20" max="20" value="0" step="5" oninput="updateAdvancedScenario()">
+          <div class="flex justify-between text-[9px] text-slate-600 mt-1"><span>-20%</span><span>+20%</span></div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+        <div class="mini-stat text-center"><span class="text-[9px] text-slate-500 block">CURRENT RISK</span><strong id="scenarioCurrentRisk" class="big-risk text-cyan-300">0%</strong></div>
+        <div class="mini-stat text-center"><span class="text-[9px] text-slate-500 block">PROJECTED RISK</span><strong id="scenarioProjectedRisk" class="big-risk text-orange-400">0%</strong></div>
+        <div class="mini-stat text-center"><span class="text-[9px] text-slate-500 block">RISK DELTA</span><strong id="scenarioDelta" class="big-risk text-amber-300">+0</strong></div>
+        <div class="mini-stat text-center"><span class="text-[9px] text-slate-500 block">EVAC WINDOW</span><strong id="scenarioEvac" class="big-risk text-emerald-300">0m</strong></div>
+      </div>
+      <div id="scenarioWarning" class="alert-strip rounded-lg p-3 mt-4 text-[10px] text-amber-200"></div>
+    </div>
+  </section>
+
+  <section class="lg:col-span-12 admin-only">
+    <div class="v6-panel">
+      <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+        <div>
+          <h3 class="text-sm font-bold flex items-center gap-2">
+            <i data-lucide="route" class="w-4 h-4 text-emerald-400"></i> AI EVACUATION OPTIMIZER
+          </h3>
+          <p class="text-[10px] text-slate-500">Compare simulated corridors using distance, ETA and hazard exposure</p>
+        </div>
+        <span class="decision-pill text-emerald-300">SAFETY-FIRST ROUTING</span>
+      </div>
+      <div id="routeOptions" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+      <div id="routeDecision" class="mt-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 text-[10px] text-emerald-200"></div>
+    </div>
+  </section>
+
+  <section class="lg:col-span-12 admin-only">
+    <div class="v6-panel">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h3 class="text-sm font-bold flex items-center gap-2">
+            <i data-lucide="radio-tower" class="w-4 h-4 text-cyan-400"></i> EMERGENCY RESPONSE SIMULATOR
+          </h3>
+          <p class="text-[10px] text-slate-500">End-to-end Sense → Predict → Prioritize → Respond workflow</p>
+        </div>
+        <span id="simulationStatus" class="decision-pill text-slate-400">READY</span>
+      </div>
+      <div id="simulationSteps" class="grid grid-cols-1 md:grid-cols-5 gap-2">
+        <div class="sim-step mini-stat" data-step="0"><span class="sim-dot"></span><b class="block text-[10px] mt-2">DETECT</b><span class="text-[9px] text-slate-500">Sensor anomaly</span></div>
+        <div class="sim-step mini-stat" data-step="1"><span class="sim-dot"></span><b class="block text-[10px] mt-2">PREDICT</b><span class="text-[9px] text-slate-500">AI risk fusion</span></div>
+        <div class="sim-step mini-stat" data-step="2"><span class="sim-dot"></span><b class="block text-[10px] mt-2">PRIORITIZE</b><span class="text-[9px] text-slate-500">Zone ranking</span></div>
+        <div class="sim-step mini-stat" data-step="3"><span class="sim-dot"></span><b class="block text-[10px] mt-2">RESPOND</b><span class="text-[9px] text-slate-500">Resources</span></div>
+        <div class="sim-step mini-stat" data-step="4"><span class="sim-dot"></span><b class="block text-[10px] mt-2">PROTECT</b><span class="text-[9px] text-slate-500">Citizen alert</span></div>
+      </div>
+      <div id="simulationOutput" class="mt-4 bg-slate-950/60 border border-slate-700 rounded-lg p-3 text-[10px] text-slate-400">
+        Press <b class="text-purple-300">RUN EMERGENCY SIMULATION</b> to execute the complete response loop.
+      </div>
+    </div>
+  </section>
+
+<section class="lg:col-span-12 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="dashboard-card p-5 lg:col-span-2 citizen-focus"><div class="flex justify-between items-center mb-4"><div><h3 class="text-sm font-bold flex items-center gap-2"><i data-lucide="route" class="w-4 h-4 text-emerald-400"></i> Smart Evacuation Planner</h3><p class="text-[10px] text-slate-500">AI-ranked safe route to nearest operational shelter</p></div><button onclick="findSafeRoute()" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded-lg text-xs font-bold">FIND SAFEST ROUTE</button></div><div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs"><div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700"><span class="text-slate-500 block">Destination</span><strong id="routeDestination">Auli Highland</strong></div><div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700"><span class="text-slate-500 block">Distance</span><strong id="routeDistance">6.8 km</strong></div><div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700"><span class="text-slate-500 block">ETA</span><strong id="routeETA" class="text-emerald-400">18 min</strong></div><div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700"><span class="text-slate-500 block">Road Risk</span><strong id="routeRisk" class="text-emerald-400">LOW</strong></div></div><div id="routeStatus" class="hidden mt-3 text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">✓ Route optimized. Map corridor highlighted in green and high-risk zone avoided.</div></div>
+    <div id="citizenPanel" class="dashboard-card p-5 citizen-focus"><div class="flex justify-between items-center mb-3"><h3 class="text-sm font-bold flex items-center gap-2"><i data-lucide="smartphone" class="w-4 h-4 text-blue-400"></i> Citizen Safety Mode</h3><span class="text-[9px] bg-blue-500/10 text-blue-300 px-2 py-1 rounded">PUBLIC VIEW</span></div><div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-3"><span class="text-[10px] text-slate-400">YOUR AREA</span><strong id="citizenArea" class="block text-lg">Joshimath</strong><span id="citizenRisk" class="text-red-400 font-bold">HIGH — 79%</span></div><div class="space-y-2 text-[10px]"><div>✓ Move to higher ground</div><div>✓ Avoid river crossings</div><div>✓ Carry medicines & ID</div><div>✓ Proceed to designated shelter</div></div><div class="grid grid-cols-1 gap-2 mt-4"><button onclick="findSafeRoute()" class="bg-emerald-600 hover:bg-emerald-500 py-2.5 rounded-lg text-xs font-bold">🟢 FIND SAFE ROUTE</button><button onclick="openReinforcementModal(true)" class="bg-red-600 hover:bg-red-500 py-2.5 rounded-lg text-xs font-bold">🆘 EMERGENCY HELP</button><a href="tel:1070" class="bg-slate-700 hover:bg-slate-600 py-2.5 rounded-lg text-xs font-bold text-center">📞 CALL 1070</a></div></div>
+  </section>
+</main>
+
+<footer class="border-t border-slate-700 px-6 py-3 text-xs text-slate-400 flex flex-wrap justify-between gap-2"><span>RAKSHA AI — Multi-Sector Intelligent Response Grid</span><span class="text-amber-300">● LIVE WEATHER + SATELLITE • AI/response actions remain prototype unless official agency APIs are connected</span></footer>
+
+<div id="notification"><div class="flex items-start gap-3"><div class="bg-red-600 p-2 rounded-lg"><i data-lucide="bell-ring" class="w-5 h-5"></i></div><div><strong id="notificationTitle" class="block text-sm">Alert</strong><p id="notificationMessage" class="text-xs text-slate-400 mt-1">Notification</p></div></div></div>
+
+<div id="modalBackdrop"><div class="modal p-5"><div class="flex justify-between items-center mb-4"><h3 id="modalTitle" class="text-base font-bold">Reinforcement Request</h3><button onclick="closeModal()" class="text-slate-400 hover:text-white text-xl">×</button></div><div id="modalBody"></div></div></div>
+
+<script>
+/* =========================================================
+   RAKSHA AI v6 — advanced decision-intelligence prototype
+   - Real XGBoost regressor exported offline from 10,010 Uttarakhand prototype records
+   - No random values are used in prediction or simulation curves
+   - Satellite imagery is the default basemap; live public feeds update weather/environment metrics
+   - Phone push uses ntfy.sh topic; user must subscribe once
+   - Dispatch/reinforcement are frontend demo workflows
+========================================================= */
+
+lucide.createIcons();
+
+const PHONE_ALERT_TOPIC = "raksha-ai-uk-demo-2026-8310";
+const MODEL = {"base":11.686676,"trees":[{"nodeid":0,"depth":0,"split":"Population","split_condition":1204681,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":46.7299995,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":534281,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.358175904},{"nodeid":8,"leaf":-0.146409646}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":11.8299999,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0181736406},{"nodeid":10,"leaf":0.466889858}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":7.53000021,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":46.0299988,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.392120481},{"nodeid":12,"leaf":0.622085214}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":50.0999985,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.721161485},{"nodeid":14,"leaf":1.16502106}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1204681,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":47.4300003,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":659279,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.311175197},{"nodeid":8,"leaf":-0.102795169}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":14.8100004,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0313131586},{"nodeid":10,"leaf":0.551077962}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":46.0900002,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Rainfall_mm","split_condition":3.44000006,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.311158955},{"nodeid":12,"leaf":0.446920395}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":14.3100004,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.63704145},{"nodeid":14,"leaf":1.17297709}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1204681,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":46.7299995,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":539350,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.307738692},{"nodeid":8,"leaf":-0.115652107}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":17.1900005,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0277903955},{"nodeid":10,"leaf":0.586194694}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":47.2999992,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":43.6199989,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.320052534},{"nodeid":12,"leaf":0.461229622}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":14.3100004,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.626865625},{"nodeid":14,"leaf":1.07283711}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1798502,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":10,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":43.8300018,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.275825977},{"nodeid":8,"leaf":-0.0846378282}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":19.9200001,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.120547503},{"nodeid":10,"leaf":0.591466784}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":49.9900017,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":44.2900009,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.299357563},{"nodeid":12,"leaf":0.478509098}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":22.2999992,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.72499299},{"nodeid":14,"leaf":1.36057055}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1139580,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":8.13000011,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":646164,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.258460969},{"nodeid":8,"leaf":-0.0724197477}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":50.4300003,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0291594174},{"nodeid":10,"leaf":0.399703771}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":7.38000011,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1895793,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.161673978},{"nodeid":12,"leaf":0.351149976}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":48.6500015,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.47640121},{"nodeid":14,"leaf":0.766630411}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1204681,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":6.51999998,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":508585,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.272843361},{"nodeid":8,"leaf":-0.100902557}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":21.0599995,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0402644239},{"nodeid":10,"leaf":0.567907691}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":8.80000019,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":46.0299988,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.261826485},{"nodeid":12,"leaf":0.426770687}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":52.5299988,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.556142628},{"nodeid":14,"leaf":0.982391655}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1088679,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":44.8400002,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":420023,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.284332246},{"nodeid":8,"leaf":-0.152925596}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":12.2299995,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0411687233},{"nodeid":10,"leaf":0.300713181}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":6.30999994,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1798502,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.011698423},{"nodeid":12,"leaf":0.263809115}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":49.5900002,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.376584053},{"nodeid":14,"leaf":0.674623191}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1088679,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":46.3300018,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Rainfall_mm","split_condition":3.81999993,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.250351071},{"nodeid":8,"leaf":-0.110315666}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":22.2999992,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0235935878},{"nodeid":10,"leaf":0.569149673}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":45.9900017,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1858091,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.0334335305},{"nodeid":12,"leaf":0.242686093}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":5.92000008,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.28913027},{"nodeid":14,"leaf":0.506972551}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1798502,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":5.69000006,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":421624,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.25046739},{"nodeid":8,"leaf":-0.0954279304}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":49.0499992,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0160727836},{"nodeid":10,"leaf":0.239914939}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":12.2299995,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":45.0800018,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.196717873},{"nodeid":12,"leaf":0.353335559}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":31.3899994,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.602992892},{"nodeid":14,"leaf":1.42363191}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":757848,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":44.8400002,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":41.8100014,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.238245919},{"nodeid":8,"leaf":-0.127903849}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":12.6199999,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0406640582},{"nodeid":10,"leaf":0.244471967}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":6.82999992,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1883845,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.0285030827},{"nodeid":12,"leaf":0.220913067}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":22.2999992,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.34243834},{"nodeid":14,"leaf":0.85382545}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1088679,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":47.5499992,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":42.0999985,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.205945715},{"nodeid":8,"leaf":-0.0821879357}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":22.2999992,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0528995506},{"nodeid":10,"leaf":0.500624061}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":49.9900017,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1895793,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.0753537714},{"nodeid":12,"leaf":0.232065439}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":21.0599995,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.402498394},{"nodeid":14,"leaf":0.836066902}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":757848,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":12.6199999,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":44.8400002,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.165547654},{"nodeid":8,"leaf":-0.0363558605}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":31.3899994,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.152641878},{"nodeid":10,"leaf":0.741546333}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":45.9900017,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1840833,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.00703544915},{"nodeid":12,"leaf":0.165148139}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":19.9200001,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.271745801},{"nodeid":14,"leaf":0.666191161}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1798502,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":48.6500015,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":534281,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.153641656},{"nodeid":8,"leaf":-0.0211900305}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":22.2999992,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.087258935},{"nodeid":10,"leaf":0.477197498}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":6.36999989,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2033917,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.104264073},{"nodeid":12,"leaf":0.218826458}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":53.3499985,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.310194731},{"nodeid":14,"leaf":0.718848944}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":757848,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":5.86999989,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":370212,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.192781106},{"nodeid":8,"leaf":-0.0796738863}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":17.1900005,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.000459925213},{"nodeid":10,"leaf":0.28344059}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":43.75,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1972494,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0048369132},{"nodeid":12,"leaf":0.148316756}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":3.81999993,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.114355437},{"nodeid":14,"leaf":0.278223723}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1798502,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":5.36000013,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":357279,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.186138824},{"nodeid":8,"leaf":-0.075271681}]},{"nodeid":4,"depth":2,"split":"Population","split_condition":531997,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0291194785},{"nodeid":10,"leaf":0.124680929}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":12.2299995,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":43.4700012,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.09038876},{"nodeid":12,"leaf":0.204791129}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":31.3899994,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.417379647},{"nodeid":14,"leaf":1.10865223}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":762407,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":48.6500015,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Rainfall_mm","split_condition":3.81999993,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.146512389},{"nodeid":8,"leaf":-0.0412809737}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":27.6399994,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0700122789},{"nodeid":10,"leaf":0.4989793}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":48.0800018,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1895793,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.0233153366},{"nodeid":12,"leaf":0.149694294}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":55,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.248059198},{"nodeid":14,"leaf":0.63713038}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":675308,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":50.5400009,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":42.0999985,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.162973985},{"nodeid":8,"leaf":-0.0622490346}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":31.3899994,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.105089717},{"nodeid":10,"leaf":0.558290958}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":3.95000005,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1168880,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0659392551},{"nodeid":12,"leaf":0.068967171}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":47.4300003,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.107125983},{"nodeid":14,"leaf":0.258136272}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":675308,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":7.05999994,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":41.8600006,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.163680047},{"nodeid":8,"leaf":-0.0729368404}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":52.0400009,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.000368670444},{"nodeid":10,"leaf":0.233181551}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":47.4300003,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1840833,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.00940415822},{"nodeid":12,"leaf":0.112723418}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":24.2600002,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.18900691},{"nodeid":14,"leaf":0.614618957}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":657378,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":6.51999998,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":295200,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.155575588},{"nodeid":8,"leaf":-0.0754460096}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":52.0400009,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0166425519},{"nodeid":10,"leaf":0.206864983}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":46.4700012,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1902796,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0172501709},{"nodeid":12,"leaf":0.105348401}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":24.2600002,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.160022274},{"nodeid":14,"leaf":0.548728526}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1204681,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":6.57999992,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":417945,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.126541555},{"nodeid":8,"leaf":-0.0364920795}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":14.8100004,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0207425524},{"nodeid":10,"leaf":0.183044508}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":6.36999989,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2006112,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.0380802155},{"nodeid":12,"leaf":0.127582714}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":54.2799988,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.208528355},{"nodeid":14,"leaf":0.577784836}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":534281,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":12.6199999,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":40.7999992,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.147708893},{"nodeid":8,"leaf":-0.0628474355}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":57.5699997,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0620052926},{"nodeid":10,"leaf":0.385496527}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":44.6500015,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1840833,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0428864844},{"nodeid":12,"leaf":0.0678386167}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":8.63000011,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0817144588},{"nodeid":14,"leaf":0.207727879}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1798502,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":42.5200005,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":370212,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.142343372},{"nodeid":8,"leaf":-0.0775555521}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":3.81999993,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0574235506},{"nodeid":10,"leaf":0.0397882722}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":52.5299988,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2100989,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.0578889735},{"nodeid":12,"leaf":0.169840068}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":31.3899994,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.320384771},{"nodeid":14,"leaf":0.837604582}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":757848,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":42.6300011,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":370212,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.129046038},{"nodeid":8,"leaf":-0.0719444901}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":51.8499985,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0175316706},{"nodeid":10,"leaf":0.147907928}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":42.4799995,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":40.1699982,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0445630401},{"nodeid":12,"leaf":0.0421648622}]},{"nodeid":6,"depth":2,"split":"Population","split_condition":2011650,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0779782087},{"nodeid":14,"leaf":0.187335685}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":536368,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":3.79999995,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":50.5400009,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.110134847},{"nodeid":8,"leaf":0.0762857944}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":52.0400009,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0302945003},{"nodeid":10,"leaf":0.121575683}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":8.13000011,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":41.2700005,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0551983044},{"nodeid":12,"leaf":0.0472099073}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":57.5699997,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.143634379},{"nodeid":14,"leaf":0.723389864}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":646164,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":50.5400009,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Rainfall_mm","split_condition":3.81999993,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0987537727},{"nodeid":8,"leaf":-0.0322022811}]},{"nodeid":4,"depth":2,"split":"Population","split_condition":539350,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0690762997},{"nodeid":10,"leaf":0.494242966}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":42.5200005,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1178690,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0589575358},{"nodeid":12,"leaf":0.0206063986}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":2.93000007,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":-0.00335776433},{"nodeid":14,"leaf":0.108185679}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1871166,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":40.4500008,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Rainfall_mm","split_condition":9.60000038,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.10906332},{"nodeid":8,"leaf":0.0444713309}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":27.6399994,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.00917630456},{"nodeid":10,"leaf":0.34068352}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":3.41000009,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2100989,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0159594435},{"nodeid":12,"leaf":0.0825149491}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":48.5699997,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.103134915},{"nodeid":14,"leaf":0.227584392}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":646164,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":13.21,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":284167,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0925272182},{"nodeid":8,"leaf":-0.0368607491}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":57.5699997,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0542381331},{"nodeid":10,"leaf":0.383498669}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":8.13000011,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2011650,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.00463831285},{"nodeid":12,"leaf":0.0993085578}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":24.2600002,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.1187355},{"nodeid":14,"leaf":0.342927665}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":657378,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":10.8999996,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":42.8699989,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0829965919},{"nodeid":8,"leaf":-0.0268498193}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":31.3899994,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0479972288},{"nodeid":10,"leaf":0.307035446}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":44.6500015,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2011650,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0217079371},{"nodeid":12,"leaf":0.0597726144}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":3.81999993,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0191935431},{"nodeid":14,"leaf":0.118774325}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1798502,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":3.81999993,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":45.1300011,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0764443651},{"nodeid":8,"leaf":-0.0193878915}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":17.1900005,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.00324668619},{"nodeid":10,"leaf":0.143020019}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":2.98000002,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2296748,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.00647948869},{"nodeid":12,"leaf":0.194084585}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":52.5299988,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0899985805},{"nodeid":14,"leaf":0.293360412}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":508585,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":43.1300011,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":279445,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.117719665},{"nodeid":8,"leaf":-0.0659405813}]},{"nodeid":4,"depth":2,"split":"Population","split_condition":284167,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0528787933},{"nodeid":10,"leaf":0.00746465707}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":47.4900017,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":1958343,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.012781661},{"nodeid":12,"leaf":0.0614998266}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":57.5699997,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0885995924},{"nodeid":14,"leaf":0.44911623}]}]}]},{"nodeid":0,"depth":0,"split":"Soil_Moisture_pct","split_condition":50.0999985,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Population","split_condition":361739,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Rainfall_mm","split_condition":5.48999977,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.07387954},{"nodeid":8,"leaf":-0.0279245246}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":40.7299995,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0467055738},{"nodeid":10,"leaf":0.0284543093}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":57.5699997,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2027300,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.0644266084},{"nodeid":12,"leaf":0.215586588}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":31.3899994,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.17156221},{"nodeid":14,"leaf":0.589444935}]}]}]},{"nodeid":0,"depth":0,"split":"Soil_Moisture_pct","split_condition":42.5200005,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Population","split_condition":1178690,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":40.4500008,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0773200393},{"nodeid":8,"leaf":-0.0295692421}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":37.3899994,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0621101595},{"nodeid":10,"leaf":0.0200331826}]}]},{"nodeid":2,"depth":1,"split":"Population","split_condition":1932202,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Rainfall_mm","split_condition":2.63000011,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0594349802},{"nodeid":12,"leaf":0.0238849819}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":1.38,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":-0.0818189234},{"nodeid":14,"leaf":0.111014806}]}]}]},{"nodeid":0,"depth":0,"split":"Rainfall_mm","split_condition":12.6199999,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Population","split_condition":2100989,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":40.4500008,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0637532473},{"nodeid":8,"leaf":-0.0040070517}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":50.6399994,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0762871504},{"nodeid":10,"leaf":0.247489288}]}]},{"nodeid":2,"depth":1,"split":"Soil_Moisture_pct","split_condition":57.5699997,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2081099,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":0.0729266331},{"nodeid":12,"leaf":0.24586007}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":27.6399994,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.136008665},{"nodeid":14,"leaf":0.494597286}]}]}]},{"nodeid":0,"depth":0,"split":"Rainfall_mm","split_condition":4.05999994,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Population","split_condition":2040082,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":40.4500008,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0714766085},{"nodeid":8,"leaf":-0.0264155939}]},{"nodeid":4,"depth":2,"split":"Population","split_condition":2213896,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0164000634},{"nodeid":10,"leaf":0.103661075}]}]},{"nodeid":2,"depth":1,"split":"Population","split_condition":508585,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Rainfall_mm","split_condition":14.8100004,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0269416329},{"nodeid":12,"leaf":0.0643729717}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":42.6699982,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.00395652652},{"nodeid":14,"leaf":0.0800459087}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":425639,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":7.38000011,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":284167,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0753484368},{"nodeid":8,"leaf":-0.0342494324}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":57.5699997,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.000559951761},{"nodeid":10,"leaf":0.346797317}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":3.44000006,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2100989,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0310750064},{"nodeid":12,"leaf":0.0557662137}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":48.0800018,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0276432503},{"nodeid":14,"leaf":0.0976674408}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":762407,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":48.6500015,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":295200,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0572168492},{"nodeid":8,"leaf":-0.0130990744}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":31.3899994,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.0281711482},{"nodeid":10,"leaf":0.304333597}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":2.98000002,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":34.6800003,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.261577964},{"nodeid":12,"leaf":-0.00950879697}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":55,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0527629033},{"nodeid":14,"leaf":0.288715839}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":427104,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Soil_Moisture_pct","split_condition":52.0400009,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Rainfall_mm","split_condition":17.8899994,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0413858183},{"nodeid":8,"leaf":0.0879193693}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":5.92000008,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.163806155},{"nodeid":10,"leaf":0.0385257341}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":5.86999989,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Population","split_condition":2033917,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.012294203},{"nodeid":12,"leaf":0.0510008261}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":57.5699997,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0530121028},{"nodeid":14,"leaf":0.397518724}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":636619,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":9.72000027,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Population","split_condition":254432,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.150468335},{"nodeid":8,"leaf":-0.0315672942}]},{"nodeid":4,"depth":2,"split":"Population","split_condition":279445,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.0391464084},{"nodeid":10,"leaf":0.0442758463}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":8.13000011,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":41.2200012,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0305446126},{"nodeid":12,"leaf":0.024900293}]},{"nodeid":6,"depth":2,"split":"Population","split_condition":2100989,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0700162947},{"nodeid":14,"leaf":0.163897708}]}]}]},{"nodeid":0,"depth":0,"split":"Rainfall_mm","split_condition":2.63000011,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Population","split_condition":1204681,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":51.4700012,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0570988916},{"nodeid":8,"leaf":0.0965733305}]},{"nodeid":4,"depth":2,"split":"Soil_Moisture_pct","split_condition":37.7700005,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":-0.12513566},{"nodeid":10,"leaf":0.0229855683}]}]},{"nodeid":2,"depth":1,"split":"Population","split_condition":370212,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":43.8300018,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0538982488},{"nodeid":12,"leaf":-0.00297239423}]},{"nodeid":6,"depth":2,"split":"Soil_Moisture_pct","split_condition":57.5699997,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.0266369339},{"nodeid":14,"leaf":0.356450289}]}]}]},{"nodeid":0,"depth":0,"split":"Population","split_condition":1889005,"yes":1,"no":2,"missing":2,"children":[{"nodeid":1,"depth":1,"split":"Rainfall_mm","split_condition":5.36000013,"yes":3,"no":4,"missing":4,"children":[{"nodeid":3,"depth":2,"split":"Soil_Moisture_pct","split_condition":48.75,"yes":7,"no":8,"missing":8,"children":[{"nodeid":7,"leaf":-0.0339447409},{"nodeid":8,"leaf":0.0255621541}]},{"nodeid":4,"depth":2,"split":"Rainfall_mm","split_condition":27.6399994,"yes":9,"no":10,"missing":10,"children":[{"nodeid":9,"leaf":0.00877719186},{"nodeid":10,"leaf":0.207657143}]}]},{"nodeid":2,"depth":1,"split":"Rainfall_mm","split_condition":3.32999992,"yes":5,"no":6,"missing":6,"children":[{"nodeid":5,"depth":2,"split":"Soil_Moisture_pct","split_condition":40.1699982,"yes":11,"no":12,"missing":12,"children":[{"nodeid":11,"leaf":-0.0715681687},{"nodeid":12,"leaf":0.0251551066}]},{"nodeid":6,"depth":2,"split":"Rainfall_mm","split_condition":22.2999992,"yes":13,"no":14,"missing":14,"children":[{"nodeid":13,"leaf":0.068393968},{"nodeid":14,"leaf":0.2780343}]}]}]}],"importance":{"Rainfall_mm":2247.05078125,"Soil_Moisture_pct":2288.757080078125,"Population":8218.9267578125}};
+const MODEL_META = {name:"XGBoost Regressor",records:10010,r2:0.621,mae:3.10,features:["Rainfall_mm","Soil_Moisture_pct","Population"]};
+const BACKEND_URL = "http://127.0.0.1:8000";
+const HAZARD_META = {
+  joshimath:{hazard:"FLASH FLOOD + LANDSLIDE",impact:"~45 min",routeRisk:"MODERATE"},
+  devprayag:{hazard:"FLASH FLOOD / CONFLUENCE",impact:"~60 min",routeRisk:"MODERATE"},
+  rudraprayag:{hazard:"RIVER FLOOD + OUTFLOW",impact:"~75 min",routeRisk:"MODERATE"},
+  haridwar:{hazard:"DOWNSTREAM FLOOD",impact:"~4 hr",routeRisk:"LOW"},
+  rishikesh:{hazard:"RIVER FLOOD",impact:"~2 hr",routeRisk:"MODERATE"},
+  srinagar:{hazard:"FLOOD + SLOPE INSTABILITY",impact:"~60 min",routeRisk:"MODERATE"},
+  pauri:{hazard:"LANDSLIDE / ROAD BLOCKAGE",impact:"~90 min",routeRisk:"MODERATE"},
+  uttarkashi:{hazard:"FLOOD + LANDSLIDE",impact:"~50 min",routeRisk:"HIGH"},
+  dehradun:{hazard:"URBAN WATERLOGGING",impact:"~2 hr",routeRisk:"LOW"},
+  bageshwar:{hazard:"CONFLUENCE FLOOD + SLOPE",impact:"~70 min",routeRisk:"MODERATE"},
+  pithoragarh:{hazard:"LANDSLIDE / ROAD BLOCKAGE",impact:"~80 min",routeRisk:"HIGH"},
+  nainital:{hazard:"LANDSLIDE + FLOOD WATCH",impact:"~55 min",routeRisk:"HIGH"}
+};
+
+
+/* Dataset-derived coefficients above were fitted offline on the supplied
+   Uttarakhand_Disaster_Prediction_10000Plus_2020_2030.csv prototype dataset. */
+
+const regionData = {
+ joshimath:{name:"Joshimath",title:"Joshimath - Chamoli GIS Hazard Map",badge:"JOSHIMATH: HIGH RISK",coords:[30.5568,79.5660],rainfall:185,soil:86,population:35700,river:4.8,slope:82,elevation:1875,historicalRain:172,confidence:94,surgeText:"Upstream surge +35%. High flash-flood velocity heading toward Devprayag in 45 mins.",zones:[{name:"Alaknanda Basin",pop:"18,500",risk:92,color:"red",status:"Surge Level Critical"},{name:"Joshimath Slope",pop:"12,200",risk:78,color:"amber",status:"Landslide Risk"},{name:"Auli Highland",pop:"5,000",risk:8,color:"emerald",status:"Safe Camp Point"}],safeZone:[30.585,79.602],route:[[30.5568,79.5660],[30.565,79.577],[30.574,79.588],[30.580,79.596],[30.585,79.602]],distance:"6.8 km",eta:"18 min",camp:"Auli Highland",camps:[{name:"Camp A: Auli Primary School",fill:92,status:"Overflow → Redirecting to Camp B"},{name:"Camp B: Higher Ground Stadium",fill:35,status:"Food, water & medical beds available"}]},
+ devprayag:{name:"Devprayag",title:"Devprayag - Tehri Confluence Hazard Map",badge:"DEVPRAYAG: ELEVATED SURGE ALERT",coords:[30.1458,78.5986],rainfall:160,soil:78,population:18700,river:4.2,slope:68,elevation:830,historicalRain:150,confidence:92,surgeText:"Bhagirathi & Alaknanda confluence water level rising rapidly (+2.8m).",zones:[{name:"Confluence Ghat Zone",pop:"8,200",risk:88,color:"red",status:"Inundation Threat"},{name:"Main Market Area",pop:"6,500",risk:65,color:"amber",status:"Waterlogging"},{name:"Upper Heights Ridge",pop:"4,000",risk:5,color:"emerald",status:"Primary Refuge"}],safeZone:[30.165,78.625],route:[[30.1458,78.5986],[30.151,78.607],[30.157,78.615],[30.163,78.621],[30.165,78.625]],distance:"5.9 km",eta:"17 min",camp:"Upper Heights Ridge",camps:[{name:"Camp A: Confluence School",fill:78,status:"Prepare overflow"},{name:"Camp B: Upper Ridge Shelter",fill:32,status:"Capacity available"}]},
+ rudraprayag:{name:"Rudraprayag",title:"Rudraprayag River Basin Map",badge:"RUDRAPRAYAG: MODERATE RISK",coords:[30.2844,78.9811],rainfall:125,soil:64,population:24500,river:3.4,slope:58,elevation:895,historicalRain:118,confidence:94,surgeText:"Mandakini river outflow under ML observation. Alert issued for bank-side settlements.",zones:[{name:"Kedarnath Route Base",pop:"11,000",risk:74,color:"amber",status:"High Velocity Outflow"},{name:"Sangam Ghat",pop:"4,500",risk:82,color:"red",status:"Evacuation Advised"},{name:"Rudraprayag Heights",pop:"9,000",risk:10,color:"emerald",status:"Safe Area"}],safeZone:[30.300,79.010],route:[[30.2844,78.9811],[30.288,78.991],[30.292,79.000],[30.297,79.006],[30.300,79.010]],distance:"6.8 km",eta:"18 min",camp:"Rudraprayag Heights",camps:[{name:"Camp A: Govt. Inter College",fill:65,status:"Normal operations"},{name:"Camp B: Rudraprayag Heights",fill:28,status:"Capacity available"}]},
+ haridwar:{name:"Haridwar",title:"Haridwar Downstream Alert Map",badge:"HARIDWAR: MONITORED FLOOD PLAIN",coords:[29.9457,78.1642],rainfall:142,soil:78,population:80000,river:3.8,slope:22,elevation:295,historicalRain:136,confidence:91,surgeText:"Upstream crest expected to arrive in 4 hours. Barrage gate operations under observation.",zones:[{name:"Low Plain Islands",pop:"25,000",risk:71,color:"amber",status:"Precautionary Alert"},{name:"Ghat Corridor",pop:"40,000",risk:52,color:"amber",status:"Crowd Advisory"},{name:"Bypass Shelter Ground",pop:"15,000",risk:4,color:"emerald",status:"Safe Zone"}],safeZone:[29.969,78.205],route:[[29.9457,78.1642],[29.951,78.174],[29.957,78.184],[29.964,78.195],[29.969,78.205]],distance:"7.4 km",eta:"21 min",camp:"Bypass Shelter Ground",camps:[{name:"Camp A: Riverside School",fill:92,status:"Overflow → Redirecting"},{name:"Camp B: Higher Ground Stadium",fill:35,status:"Food, water & medical beds available"}]},
+ rishikesh:{name:"Rishikesh",title:"Rishikesh River Corridor Hazard Map",badge:"RISHIKESH: ELEVATED RIVER WATCH",coords:[30.0869,78.2676],rainfall:148,soil:74,population:52000,river:4.1,slope:35,elevation:372,historicalRain:141,confidence:93,surgeText:"Ganga level rising near river corridor. Low-lying public access points under watch.",zones:[{name:"Triveni Ghat Corridor",pop:"19,000",risk:84,color:"red",status:"River-edge exposure"},{name:"Muni Ki Reti Lowland",pop:"17,000",risk:68,color:"amber",status:"Flood watch"},{name:"High Bank Shelter",pop:"16,000",risk:7,color:"emerald",status:"Safe refuge"}],safeZone:[30.106,78.289],route:[[30.0869,78.2676],[30.091,78.273],[30.097,78.279],[30.102,78.285],[30.106,78.289]],distance:"5.2 km",eta:"15 min",camp:"High Bank Shelter",camps:[{name:"Camp A: River School",fill:81,status:"Prepare overflow"},{name:"Camp B: High Bank Shelter",fill:38,status:"Capacity available"}]},
+ srinagar:{name:"Srinagar Garhwal",title:"Srinagar Garhwal Multi-Hazard Map",badge:"SRINAGAR GARHWAL: ELEVATED RISK",coords:[30.2225,78.7830],rainfall:132,soil:70,population:29000,river:3.6,slope:64,elevation:560,historicalRain:126,confidence:90,surgeText:"Alaknanda corridor and slope instability indicators are elevated.",zones:[{name:"River Terrace",pop:"10,500",risk:76,color:"red",status:"Flood exposure"},{name:"Market Slope",pop:"9,500",risk:61,color:"amber",status:"Slope movement watch"},{name:"Upper Ridge",pop:"9,000",risk:9,color:"emerald",status:"Safe area"}],safeZone:[30.238,78.802],route:[[30.2225,78.783],[30.226,78.788],[30.231,78.794],[30.235,78.799],[30.238,78.802]],distance:"5.7 km",eta:"17 min",camp:"Upper Ridge",camps:[{name:"Camp A: River School",fill:73,status:"Monitor capacity"},{name:"Camp B: Upper Ridge",fill:31,status:"Capacity available"}]},
+ pauri:{name:"Pauri Garhwal",title:"Pauri Garhwal Slope & Rainfall Map",badge:"PAURI GARHWAL: MODERATE RISK",coords:[30.146,78.777],rainfall:118,soil:67,population:24000,river:2.5,slope:76,elevation:1650,historicalRain:112,confidence:89,surgeText:"Heavy rainfall combined with steep terrain raises localized landslide exposure.",zones:[{name:"Steep Slope Cluster",pop:"8,000",risk:73,color:"amber",status:"Landslide watch"},{name:"Lower Road Corridor",pop:"7,000",risk:55,color:"amber",status:"Drainage risk"},{name:"Pauri Ridge",pop:"9,000",risk:8,color:"emerald",status:"Safe area"}],safeZone:[30.160,78.792],route:[[30.146,78.777],[30.149,78.781],[30.153,78.785],[30.157,78.789],[30.160,78.792]],distance:"4.8 km",eta:"16 min",camp:"Pauri Ridge",camps:[{name:"Camp A: Hill School",fill:68,status:"Normal operations"},{name:"Camp B: Pauri Ridge",fill:29,status:"Capacity available"}]},
+ uttarkashi:{name:"Uttarkashi",title:"Uttarkashi River & Slope Hazard Map",badge:"UTTARKASHI: ELEVATED FLOOD + SLOPE RISK",coords:[30.7268,78.4354],rainfall:155,soil:79,population:31000,river:4.3,slope:81,elevation:1150,historicalRain:149,confidence:92,surgeText:"Bhagirathi corridor shows elevated surge and slope-risk indicators.",zones:[{name:"Bhagirathi Bank",pop:"12,000",risk:86,color:"red",status:"Flood exposure"},{name:"Hill Road Cluster",pop:"10,000",risk:79,color:"amber",status:"Landslide risk"},{name:"Upper Ground",pop:"9,000",risk:7,color:"emerald",status:"Safe refuge"}],safeZone:[30.745,78.455],route:[[30.7268,78.4354],[30.731,78.440],[30.736,78.445],[30.741,78.450],[30.745,78.455]],distance:"6.1 km",eta:"20 min",camp:"Upper Ground",camps:[{name:"Camp A: River School",fill:88,status:"Overflow risk"},{name:"Camp B: Upper Ground",fill:34,status:"Capacity available"}]},
+ dehradun:{name:"Dehradun",title:"Dehradun Valley Urban Flood Map",badge:"DEHRADUN: URBAN FLOOD WATCH",coords:[30.3165,78.0322],rainfall:138,soil:76,population:90000,river:3.2,slope:18,elevation:640,historicalRain:130,confidence:90,surgeText:"Urban drainage load and rainfall intensity indicate localized waterlogging risk.",zones:[{name:"Low-Lying Urban Pocket",pop:"35,000",risk:72,color:"amber",status:"Waterlogging risk"},{name:"River Corridor",pop:"28,000",risk:64,color:"amber",status:"Drainage watch"},{name:"Higher Ground Zone",pop:"27,000",risk:6,color:"emerald",status:"Safe area"}],safeZone:[30.335,78.055],route:[[30.3165,78.0322],[30.321,78.037],[30.326,78.043],[30.331,78.049],[30.335,78.055]],distance:"5.4 km",eta:"16 min",camp:"Higher Ground Zone",camps:[{name:"Camp A: City School",fill:84,status:"Prepare overflow"},{name:"Camp B: Higher Ground",fill:42,status:"Capacity available"}]},
+ bageshwar:{name:"Bageshwar",title:"Bageshwar Confluence Hazard Map",badge:"BAGESHWAR: ELEVATED RISK",coords:[29.838,79.771],rainfall:128,soil:73,population:17000,river:3.5,slope:70,elevation:1004,historicalRain:121,confidence:88,surgeText:"River confluence and steep terrain increase localized flood exposure.",zones:[{name:"Saryu Confluence",pop:"6,500",risk:78,color:"red",status:"Inundation watch"},{name:"Town Slope",pop:"5,500",risk:59,color:"amber",status:"Slope watch"},{name:"Upper Ridge",pop:"5,000",risk:8,color:"emerald",status:"Safe area"}],safeZone:[29.856,79.789],route:[[29.838,79.771],[29.842,79.776],[29.847,79.781],[29.852,79.786],[29.856,79.789]],distance:"5.1 km",eta:"18 min",camp:"Upper Ridge",camps:[{name:"Camp A: Confluence School",fill:71,status:"Monitor capacity"},{name:"Camp B: Upper Ridge",fill:27,status:"Capacity available"}]},
+ pithoragarh:{name:"Pithoragarh",title:"Pithoragarh Mountain Hazard Map",badge:"PITHORAGARH: SLOPE RISK",coords:[29.5829,80.2182],rainfall:116,soil:69,population:22000,river:2.8,slope:88,elevation:1627,historicalRain:108,confidence:87,surgeText:"Steep terrain and rainfall create elevated landslide exposure along mountain roads.",zones:[{name:"Mountain Road Cluster",pop:"9,000",risk:81,color:"red",status:"Landslide risk"},{name:"Town Drainage Zone",pop:"7,000",risk:58,color:"amber",status:"Waterlogging watch"},{name:"Upper Plateau",pop:"6,000",risk:6,color:"emerald",status:"Safe area"}],safeZone:[29.600,80.240],route:[[29.5829,80.2182],[29.587,80.223],[29.592,80.228],[29.597,80.235],[29.600,80.240]],distance:"5.9 km",eta:"22 min",camp:"Upper Plateau",camps:[{name:"Camp A: Hill School",fill:76,status:"Prepare overflow"},{name:"Camp B: Upper Plateau",fill:30,status:"Capacity available"}]},
+ nainital:{name:"Nainital",title:"Nainital Lake & Slope Hazard Map",badge:"NAINITAL: SLOPE / FLOOD WATCH",coords:[29.3919,79.4542],rainfall:146,soil:77,population:36000,river:2.9,slope:86,elevation:2084,historicalRain:139,confidence:91,surgeText:"High rainfall with steep slopes increases landslide and road-access risk.",zones:[{name:"Lake Edge Corridor",pop:"13,000",risk:69,color:"amber",status:"Flood / crowd watch"},{name:"Steep Slope Roads",pop:"14,000",risk:83,color:"red",status:"Landslide risk"},{name:"Upper Ridge",pop:"9,000",risk:7,color:"emerald",status:"Safe refuge"}],safeZone:[29.410,79.470],route:[[29.3919,79.4542],[29.396,79.458],[29.401,79.462],[29.406,79.467],[29.410,79.470]],distance:"4.6 km",eta:"19 min",camp:"Upper Ridge",camps:[{name:"Camp A: Lake School",fill:86,status:"Prepare overflow"},{name:"Camp B: Upper Ridge",fill:33,status:"Capacity available"}]}
+};
+
+const languageMessages={en:"EMERGENCY ALERT: Water levels/rainfall risk are rising. Move to higher ground, avoid river crossings and proceed to the designated safe shelter. Citizens without smartphones call 1070.",hi:"आपातकालीन चेतावनी: नदी का जलस्तर/बारिश का जोखिम बढ़ रहा है। ऊँचे स्थान पर जाएँ, नदी पार करने से बचें और निर्धारित सुरक्षित आश्रय पर पहुँचें। बिना स्मार्टफोन वाले नागरिक 1070 पर कॉल करें।",gar:"चेतावनी: नदी मा पाणी अर बारिश को खतरो बडन च। ऊंच जगह जावा, नदी पार न करा अर सुरक्षित ठौर मा पहुंचा। बिना फोन वाला लोग 1070 पर फोन करा।",kum:"सावधान: नदी में पाणि अर बारिश को खतरो बढ़ि रयो छ। ऊंच जगह जाओ, नदी पार न करो अर सुरक्षित ठौर मा पहुंचो। बिना फोन वाला लोग 1070 मा फोन करो।"};
+
+let currentRegion="joshimath", map, riskCircle, dangerMarker, safeZoneCircle, safeZoneMarker, routeLine=null, routeStartMarker=null, routeEndMarker=null, mlChart, scenarioRainOffset=0, citizenMode=false;
+let sensorLayer=L.layerGroup(), shelterLayer=L.layerGroup(), routeLayer=L.layerGroup(), mapLayers={risk:true,sensors:true,shelters:true,route:false};
+let lastAutomaticWarning="";
+let resourceState={ambulances:14,boats:22,choppers:3};
+
+function populateRegions(){const s=document.getElementById('regionSelect');s.innerHTML=Object.entries(regionData).map(([key,d])=>`<option value="${key}">Sector: ${d.name}${key==='devprayag'?' - Tehri':''}</option>`).join('');s.value=currentRegion;}
+function evalXGBTree(node,features){if(node.leaf!==undefined)return node.leaf;const value=features[node.split];return value<node.split_condition?evalXGBTree(node.children.find(c=>c.nodeid===node.yes),features):evalXGBTree(node.children.find(c=>c.nodeid===node.no),features);}
+function xgbPredict(data,rainOverride=null){const eventRain=rainOverride===null?data.rainfall:rainOverride;const features={Rainfall_mm:Math.min(92,eventRain/2),Soil_Moisture_pct:data.soil,Population:data.population};let prediction=MODEL.base;for(const tree of MODEL.trees)prediction+=evalXGBTree(tree,features);return Math.max(0,Math.min(68,prediction));}
+function riskFromML(data,rainOverride=null){return xgbPredict(data,rainOverride);}
+function calculateRisk(data,rainOverride=null){
+  const rain=rainOverride===null?data.rainfall:rainOverride;
+  const mlRaw=riskFromML(data,rain);
+  const mlScore=Math.min(100,Math.max(0,(mlRaw/68)*100));
+  const environmentScore=(Math.min(rain/200,1)*100*.35)+(data.soil*.25)+(Math.min(data.river/5,1)*100*.20)+(data.slope*.20);
+  const composite=(mlScore*.30)+(environmentScore*.70);
+  return Math.round(Math.max(1,Math.min(99,composite)));
+}
+function checkAutomaticEarlyWarning(r,data){
+  const warningLevel = r>=85 ? 'CRITICAL' : r>=70 ? 'HIGH' : '';
+
+  /* AUTOMATIC SIREN:
+     HIGH (70+) and CRITICAL (85+) both activate the siren.
+     It remains active while the selected region is HIGH/CRITICAL. */
+  if(warningLevel){
+    automaticSirenActive=true;
+    startSiren();
+  }else{
+    automaticSirenActive=false;
+    if(!manualSirenActive) stopSiren();
+    lastAutomaticWarning='';
+    return;
+  }
+
+  if(lastAutomaticWarning===warningLevel) return;
+  lastAutomaticWarning=warningLevel;
+
+  if(warningLevel==='CRITICAL'){
+    showNotification('🚨 CRITICAL EARLY WARNING',
+      data.name+' risk is '+r+'%. IMMEDIATE EVACUATION IS RECOMMENDED.');
+    addActivity('EARLY WARNING',
+      'CRITICAL • '+data.name+' • Risk '+r+'% • Automatic siren activated');
+  }else{
+    showNotification('🔴 HIGH-RISK EARLY WARNING',
+      data.name+' risk is '+r+'%. Automatic siren activated. Prepare evacuation.');
+    addActivity('EARLY WARNING',
+      'HIGH RISK • '+data.name+' • Risk '+r+'% • Automatic siren activated');
+  }
+}
+function riskLevel(r){return r>=85?'CRITICAL':r>=70?'HIGH':r>=40?'MODERATE':'LOW'}
+function riskClass(r){return r>=85?'text-red-400':r>=70?'text-orange-400':r>=40?'text-amber-400':'text-emerald-400'}
+function getPopulation(data){return data.population.toLocaleString('en-IN')}
+function getEvacWindow(r){return Math.max(12,Math.round(70-r*.37))}
+
+function makeDivIcon(cls){return L.divIcon({className:"",html:`<div class="${cls}"></div>`,iconSize:[16,16],iconAnchor:[8,8]});}
+function initMap(){
+  map=L.map('map').setView(regionData[currentRegion].coords,11);
+  const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'});
+  const streets=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'});
+  satellite.addTo(map);
+  L.control.layers({'Satellite':satellite,'Street map':streets},null,{position:'topleft',collapsed:true}).addTo(map);
+  riskCircle=L.circle(regionData[currentRegion].coords,{color:'#ef4444',fillColor:'#f87171',fillOpacity:.28,radius:3000,weight:2}).addTo(map);
+  dangerMarker=L.marker(regionData[currentRegion].coords).addTo(map).bindPopup('<b>AI Decision Risk Zone</b><br>Current sector risk area');
+  safeZoneCircle=L.circleMarker(regionData[currentRegion].safeZone,{radius:12,color:'#10b981',fillColor:'#34d399',fillOpacity:.85,weight:3}).addTo(map);
+  safeZoneMarker=L.marker(regionData[currentRegion].safeZone,{opacity:0}).addTo(map);
+  safeZoneCircle.bindTooltip('SAFE ZONE • Recommended shelter',{permanent:true,direction:'top',className:'safe-tooltip'}).openTooltip();
+  sensorLayer.addTo(map); shelterLayer.addTo(map); routeLayer.removeFrom(map);
+  renderMapOverlays();
+}
+function renderMapOverlays(){
+  const d=regionData[currentRegion];
+  sensorLayer.clearLayers(); shelterLayer.clearLayers();
+  const sensorPts=[[d.coords[0]+.008,d.coords[1]-.010],[d.coords[0]-.006,d.coords[1]+.014],[d.coords[0]+.012,d.coords[1]+.018]];
+  sensorPts.forEach((p,i)=>L.marker(p,{icon:makeDivIcon('sensor-marker')}).bindTooltip(`SENSOR ${i+1} • telemetry ${i===0?'river':'rainfall'}`).addTo(sensorLayer));
+  L.marker(d.safeZone,{icon:makeDivIcon('shelter-marker')}).bindTooltip(`SHELTER • ${d.camp}`).addTo(shelterLayer);
+  sensorLayer[mapLayers.sensors?'addTo':'removeFrom'](map); shelterLayer[mapLayers.shelters?'addTo':'removeFrom'](map);
+  routeLayer[mapLayers.route?'addTo':'removeFrom'](map);
+}
+function updateMap(){
+  const d=regionData[currentRegion];
+  map.setView(d.coords,11);
+  riskCircle.setLatLng(d.coords).setRadius(d.river>4?3500:2600);
+  dangerMarker.setLatLng(d.coords); safeZoneCircle.setLatLng(d.safeZone); safeZoneMarker.setLatLng(d.safeZone);
+  if(routeLine){routeLayer.removeLayer(routeLine);routeLine=null;} if(routeStartMarker){routeLayer.removeLayer(routeStartMarker);routeStartMarker=null;} if(routeEndMarker){routeLayer.removeLayer(routeEndMarker);routeEndMarker=null;}
+  document.getElementById('routeStatus').classList.add('hidden'); renderMapOverlays();
+}
+function showRouteOnMap(){
+  const d=regionData[currentRegion];
+  if(routeLine)routeLayer.removeLayer(routeLine); if(routeStartMarker)routeLayer.removeLayer(routeStartMarker); if(routeEndMarker)routeLayer.removeLayer(routeEndMarker);
+  routeLine=L.polyline(d.route,{color:'#34d399',weight:7,opacity:.92,dashArray:'10 7'}).addTo(routeLayer);
+  routeStartMarker=L.circleMarker(d.route[0],{radius:8,color:'#fff',fillColor:'#ef4444',fillOpacity:1,weight:2}).addTo(routeLayer).bindTooltip('START • At-risk sector',{direction:'top'});
+  routeEndMarker=L.circleMarker(d.safeZone,{radius:12,color:'#fff',fillColor:'#10b981',fillOpacity:1,weight:3}).addTo(routeLayer).bindTooltip('SAFE SHELTER • '+d.camp,{direction:'top'});
+  mapLayers.route=true; routeLayer.addTo(map); map.fitBounds(routeLine.getBounds(),{padding:[40,40]});
+  document.querySelector('[data-layer="route"]')?.classList.add('active');
+}
+function toggleMapLayer(layer){
+  mapLayers[layer]=!mapLayers[layer];
+  const obj=layer==='risk'?riskCircle:layer==='sensors'?sensorLayer:layer==='shelters'?shelterLayer:routeLayer;
+  if(mapLayers[layer])obj.addTo(map);else map.removeLayer(obj);
+  document.querySelector(`[data-layer="${layer}"]`)?.classList.toggle('active',mapLayers[layer]);
+}
+function renderZones(){const zones=regionData[currentRegion].zones;document.getElementById('zoneGrid').innerHTML=zones.map((z,i)=>{const c=z.color==='red'?'border-red-500/40 text-red-400':z.color==='amber'?'border-amber-500/40 text-amber-400':'border-emerald-500/40 text-emerald-400';return `<div class="min-h-[145px] bg-slate-900/60 border ${c} p-3 rounded-lg"><div class="flex justify-between items-center mb-2"><strong>${z.name}</strong><span class="text-[9px] bg-slate-700 text-slate-200 px-2 py-1 rounded">${z.color==='emerald'?'SAFE':'PRIORITY '+(i+1)}</span></div><p class="text-xs text-slate-400">Population: <strong class="text-white">${z.pop}</strong></p><p class="text-xs text-slate-400 mt-1">Risk: <strong class="${c.split(' ')[1]}">${z.risk}%</strong></p><p class="text-xs text-slate-500 mt-2">${z.status}</p></div>`}).join('');}
+function renderCamps(){const camps=regionData[currentRegion].camps;document.getElementById('campGrid').innerHTML=camps.map(c=>{const cls=c.fill>=85?'bg-red-500':c.fill>=70?'bg-amber-400':'bg-emerald-400';return `<div class="bg-slate-900/50 border border-slate-700 rounded-lg p-3 mb-3"><div class="flex justify-between text-xs mb-2"><strong>${c.name}</strong><span class="${c.fill>=85?'text-red-400':c.fill>=70?'text-amber-400':'text-emerald-400'}">${c.fill}% Full</span></div><div class="progress"><span class="${cls}" style="width:${c.fill}%"></span></div><p class="text-[11px] ${c.fill>=85?'text-amber-300':'text-slate-400'} mt-2">${c.status}</p></div>`}).join('');}
+function renderResources(){const d=regionData[currentRegion];const values=[['Medical Kits',Math.max(62,92-Math.round(d.river*2))],['Water Supply',Math.max(58,88-Math.round(d.river*3))],['Rescue Gear',Math.max(65,95-Math.round(d.slope*.05))],['Fuel Reserve',Math.max(55,78-Math.round(d.river*2))]];document.getElementById('resourceGrid').innerHTML=values.map(([n,v])=>`<div class="bg-slate-900/60 border border-slate-700 p-3 rounded-lg"><div class="flex justify-between text-[10px] mb-2"><span>${n}</span><strong class="text-emerald-300">${v}%</strong></div><div class="progress"><span class="bg-gradient-to-r from-emerald-400 to-cyan-400" style="width:${v}%"></span></div></div>`).join('');}
+function featureContributions(data){
+  const gain=MODEL.importance||{Rainfall_mm:1,Soil_Moisture_pct:1,Population:1};
+  const totalGain=gain.Rainfall_mm+gain.Soil_Moisture_pct+gain.Population;
+  return [
+    ['Rainfall intensity',(gain.Rainfall_mm/totalGain*80)],
+    ['Soil saturation',(gain.Soil_Moisture_pct/totalGain*80)],
+    ['Population exposure',(gain.Population/totalGain*80)],
+    ['River + terrain modifiers',20]
+  ];
+}
+function renderFeatures(){const vals=featureContributions(regionData[currentRegion]);document.getElementById('featureBars').innerHTML=vals.map(([n,v])=>`<div class="bg-slate-900/60 border border-slate-700 rounded-lg p-3"><div class="flex justify-between text-[10px] mb-2"><span>${n}</span><strong>${Math.round(v)}%</strong></div><div class="progress"><span class="bg-gradient-to-r from-amber-400 to-red-400" style="width:${Math.min(100,v)}%"></span></div></div>`).join('');}
+function updateCommandCenter(){
+  const d=regionData[currentRegion],meta=HAZARD_META[currentRegion],r=calculateRisk(d,d.rainfall+scenarioRainOffset),level=riskLevel(r),cls=riskClass(r),ev=getEvacWindow(r);
+  const raw=riskFromML(d,d.rainfall+scenarioRainOffset),mlScore=Math.round(Math.min(100,Math.max(0,raw/68*100)));
+  document.getElementById('topThreat').textContent=r+'%'; document.getElementById('topThreat').className='block text-xl mt-1 '+cls;
+  checkAutomaticEarlyWarning(r,d);
+  document.getElementById('topThreatLabel').textContent='● AI + operational • '+level;
+  document.getElementById('topPopulation').textContent=getPopulation(d);
+  document.getElementById('topEvac').textContent=ev+' min';
+  document.getElementById('topConfidence').textContent=d.confidence+'%';
+  document.getElementById('commandConfidence').textContent=d.confidence+'%';
+  document.getElementById('aiRiskValue').textContent=r+'%'; document.getElementById('aiRiskValue').className='text-3xl '+cls;
+  document.getElementById('aiRiskLevel').textContent=level; document.getElementById('aiRiskLevel').className='text-[9px] font-bold '+cls;
+  document.getElementById('riskRain').textContent=(d.rainfall+scenarioRainOffset)+' mm'; document.getElementById('riskSoil').textContent=d.soil+'%';
+  document.getElementById('evacWindow').textContent=ev+' MIN'; document.getElementById('citizenArea').textContent=d.name;
+  document.getElementById('citizenRisk').textContent=level+' — '+r+'%';document.getElementById('citizenRisk').className='font-bold '+cls;
+  document.getElementById('riskGauge').style.background=`conic-gradient(#ef4444 ${r*3.6}deg,#334155 ${r*3.6}deg,#334155 360deg)`;
+  document.getElementById('topHazard').textContent='Hazard: '+meta.hazard;
+  document.getElementById('impactHorizon').textContent='Impact horizon: '+meta.impact;
+  document.getElementById('routeRisk').textContent=meta.routeRisk;
+  document.getElementById('routeRisk').className='font-bold '+(meta.routeRisk==='HIGH'?'text-red-400':meta.routeRisk==='MODERATE'?'text-amber-400':'text-emerald-400');
+  const gap=Math.abs(r-mlScore);
+  document.getElementById('riskConsistency').textContent=gap<15?'Model + environment aligned':'Model / environment diverge — inspect inputs';
+  document.getElementById('riskConsistency').className='metric-note '+(gap<15?'text-emerald-400':'text-amber-300');
+  renderFeatures(); updateRecommendations(r); updateTimeline(r); renderDecisionBoard(r,raw,mlScore); renderDiagnostics(d,raw);
+}
+function renderDecisionBoard(r,raw,mlScore){
+  const d=regionData[currentRegion];
+  const ranked=[...d.zones].sort((a,b)=>b.risk-a.risk);
+  document.getElementById('priorityBoard').innerHTML=ranked.map((z,i)=>`<div class="flex items-center justify-between bg-slate-900/60 border border-slate-700 rounded-lg p-2"><div><span class="text-[9px] text-slate-500">P${i+1}</span><b class="text-[10px] ml-2">${z.name}</b></div><strong class="text-[10px] ${z.risk>=85?'text-red-400':z.risk>=70?'text-amber-400':'text-emerald-400'}">${z.risk}%</strong></div>`).join('');
+  const vals=featureContributions(d);
+  document.getElementById('riskBreakdown').innerHTML=vals.map(([n,v])=>`<div><div class="flex justify-between text-[9px] mb-1"><span>${n}</span><b>${Math.round(v)}%</b></div><div class="progress"><span class="bg-gradient-to-r from-amber-400 to-red-400" style="width:${Math.min(100,v)}%"></span></div></div>`).join('')+
+    `<div class="text-[9px] text-slate-500 pt-1 border-t border-slate-700">Composite: 30% embedded ML signal + 70% operational environment.</div>`;
+}
+function renderDiagnostics(d,raw){
+  document.getElementById('modelDiagnostics').innerHTML=
+    `<div class="flex justify-between"><span>Model</span><b>${MODEL_META.name}</b></div>
+     <div class="flex justify-between"><span>Training records</span><b>${MODEL_META.records.toLocaleString()}</b></div>
+     <div class="flex justify-between"><span>Validation R²</span><b>${MODEL_META.r2.toFixed(2)}</b></div>
+     <div class="flex justify-between"><span>Local raw output</span><b>${raw.toFixed(2)}</b></div>
+     <div class="flex justify-between"><span>Features used by embedded model</span><b>${MODEL_META.features.length}</b></div>
+     <div class="mt-2 text-[9px] text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded p-2">Retraining is recommended before claiming production-grade multi-sensor prediction. Current frontend model uses rainfall, soil moisture and population.</div>`;
+}
+function updateRecommendations(r){const d=regionData[currentRegion];document.getElementById('aiRecommendation').innerHTML=r>=85?`<div>🔴 Evacuate <b>${d.zones[0].name}</b> immediately</div><div>🟠 Deploy rescue teams to Priority Zone 1</div><div>🔵 Position ambulances near ${d.camp}</div><div>🟢 Activate shelter overflow protocol</div>`:r>=70?`<div>🟠 Prepare ${d.zones[0].name} for evacuation</div><div>🟡 Move emergency vehicles closer</div><div>🔵 Issue precautionary public warning</div><div>🟢 Keep ${d.camp} ready for overflow</div>`:`<div>🟢 Continue environmental monitoring</div><div>🔵 Keep emergency resources on standby</div><div>🟡 Monitor rainfall and river trends</div>`;}
+function updateTimeline(r){document.getElementById('incidentTimeline').innerHTML=`<div><b class="text-red-400">NOW</b> — Sensor fusion updated</div><div><b class="text-amber-400">+15m</b> — River trend evaluated</div><div><b class="text-orange-400">+30m</b> — Risk score ${r>=70?'crosses high-risk':'remains monitored'}</div><div><b class="text-red-400">+45m</b> — Downstream impact projection</div><div><b class="text-emerald-400">+60m</b> — Evacuation checkpoint</div>`;}
+
+function modelPrediction(data,rain){return calculateRisk(data,rain);}
+function buildGraph(){const d=regionData[currentRegion],labels=['02:00','04:00','06:00','08:00','10:00','12:00'];const baseline=[0,1,2,3,4,5].map(x=>Math.max(5,Math.round(modelPrediction(d,Math.max(10,d.rainfall-45+x*8))*0.78)));const pred=[0,1,2,3,4,5].map(x=>modelPrediction(d,Math.max(10,d.rainfall-35+x*10+scenarioRainOffset)));mlChart.data.labels=labels;mlChart.data.datasets[0].data=pred;mlChart.data.datasets[1].data=baseline;mlChart.update();}
+function initChart(){const ctx=document.getElementById('mlGraph').getContext('2d');mlChart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[{label:'ML projected risk',data:[],borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.10)',fill:true,tension:.35,pointRadius:4},{label:'Sensor baseline',data:[],borderColor:'#94a3b8',borderDash:[5,5],backgroundColor:'transparent',fill:false,tension:.25,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{color:'#cbd5e1',font:{size:10}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'% risk'}}},scales:{x:{ticks:{color:'#94a3b8',font:{size:10}}},y:{beginAtZero:true,max:100,ticks:{color:'#94a3b8',font:{size:10},callback:v=>v+'%'}}}}});buildGraph();}
+function adjustScenario(delta){scenarioRainOffset=Math.max(-40,Math.min(40,scenarioRainOffset+delta));document.getElementById('scenarioBadge').textContent='SCENARIO: '+(scenarioRainOffset>0?'RAIN +'+scenarioRainOffset+'mm':scenarioRainOffset<0?'RAIN '+scenarioRainOffset+'mm':'BASE');updateCommandCenter();buildGraph();showNotification('📈 SCENARIO UPDATED',`Rainfall offset ${scenarioRainOffset>=0?'+':''}${scenarioRainOffset} mm. Prediction recalculated deterministically.`);}
+function resetScenario(){scenarioRainOffset=0;document.getElementById('scenarioBadge').textContent='SCENARIO: BASE';updateCommandCenter();buildGraph();}
+
+function changeRegion(){currentRegion=document.getElementById('regionSelect').value;const d=regionData[currentRegion];document.getElementById('mapTitle').innerHTML=`<i data-lucide="map-pin" class="w-5 h-5 text-blue-400"></i> ${d.title}`;document.getElementById('activeSectorBadge').textContent=d.badge;document.getElementById('riskCardTitle').textContent='AI Decision Risk • '+HAZARD_META[currentRegion].hazard;document.getElementById('riverSurgeText').textContent=d.surgeText;document.getElementById('alertTextArea').value=languageMessages[document.getElementById('langSelect').value];updateMap();renderZones();renderCamps();renderResources();updateCommandCenter();buildGraph();document.getElementById('routeDestination').textContent=d.camp;document.getElementById('routeDistance').textContent=d.distance;document.getElementById('routeETA').textContent=d.eta;document.getElementById('routeRisk').textContent=HAZARD_META[currentRegion].routeRisk;lucide.createIcons();showNotification('📍 REGION UPDATED',d.badge);showNotification('📍 REGION UPDATED',d.badge);updateCommandCenter();}
+function updateLanguageMessage(){document.getElementById('alertTextArea').value=languageMessages[document.getElementById('langSelect').value];}
+function findSafeRoute(){const d=regionData[currentRegion];showRouteOnMap();document.getElementById('routeDestination').textContent=d.camp;document.getElementById('routeDistance').textContent=d.distance;document.getElementById('routeETA').textContent=d.eta;document.getElementById('routeRisk').textContent=HAZARD_META[currentRegion].routeRisk;document.getElementById('routeStatus').classList.remove('hidden');showNotification('🛣️ SAFE ROUTE OPTIMIZED',`Green corridor mapped to ${d.camp}; high-risk zone avoided.`);}
+
+let audioContext=null,sirenOscillator=null,sirenGain=null,sirenInterval=null;
+let automaticSirenActive=false;
+let manualSirenActive=false;
+let audioNeedsUserUnlock=false;
+
+function ensureAudioContext(){
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx) return false;
+    if(!audioContext) audioContext=new Ctx();
+    if(audioContext.state==='suspended'){
+      audioContext.resume().catch(()=>{audioNeedsUserUnlock=true;});
+      if(audioContext.state==='suspended') return false;
+    }
+    return true;
+  }catch(e){
+    audioNeedsUserUnlock=true;
+    return false;
+  }
+}
+
+function startSiren(){
+  if(sirenOscillator){
+    if(audioContext && audioContext.state==='suspended')
+      audioContext.resume().catch(()=>{audioNeedsUserUnlock=true;});
+    return;
+  }
+
+  if(!ensureAudioContext()){
+    audioNeedsUserUnlock=true;
+    document.getElementById('broadcastCard')?.classList.add('siren-active');
+    return;
+  }
+
+  try{
+    sirenOscillator=audioContext.createOscillator();
+    sirenGain=audioContext.createGain();
+    sirenOscillator.type='sawtooth';
+    sirenGain.gain.setValueAtTime(0.0001,audioContext.currentTime);
+    sirenOscillator.connect(sirenGain);
+    sirenGain.connect(audioContext.destination);
+    sirenOscillator.frequency.setValueAtTime(550,audioContext.currentTime);
+    sirenOscillator.start();
+
+    let high=false;
+    sirenInterval=setInterval(()=>{
+      if(!sirenOscillator || !audioContext) return;
+      high=!high;
+      sirenOscillator.frequency.setTargetAtTime(high?950:550,audioContext.currentTime,.08);
+      sirenGain.gain.setTargetAtTime(.12,audioContext.currentTime,.05);
+    },450);
+
+    sirenGain.gain.setTargetAtTime(.12,audioContext.currentTime,.05);
+    audioNeedsUserUnlock=false;
+    document.getElementById('broadcastCard')?.classList.add('siren-active');
+  }catch(e){
+    audioNeedsUserUnlock=true;
+  }
+}
+
+function stopSiren(){
+  if(!sirenOscillator){
+    document.getElementById('broadcastCard')?.classList.remove('siren-active');
+    return;
+  }
+
+  clearInterval(sirenInterval);
+  sirenInterval=null;
+
+  try{
+    sirenGain?.gain.setTargetAtTime(.0001,audioContext.currentTime,.05);
+    const osc=sirenOscillator;
+    setTimeout(()=>{try{osc.stop()}catch(e){}},150);
+  }catch(e){}
+
+  sirenOscillator=null;
+  sirenGain=null;
+  document.getElementById('broadcastCard')?.classList.remove('siren-active');
+}
+
+/* Chrome/Edge block audible autoplay until a user gesture.
+   The first click/tap/key press arms the audio; after that,
+   HIGH/CRITICAL alerts can start the siren automatically. */
+function unlockSirenAudio(){
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx) return;
+    if(!audioContext) audioContext=new Ctx();
+
+    const p=audioContext.resume();
+    if(p && p.then){
+      p.then(()=>{
+        audioNeedsUserUnlock=false;
+        if(automaticSirenActive || manualSirenActive) startSiren();
+      }).catch(()=>{});
+    }
+  }catch(e){}
+}
+
+['pointerdown','keydown','touchstart'].forEach(evt=>{
+  document.addEventListener(evt,unlockSirenAudio,{passive:true});
+});
+
+function connectPhoneAlert(){window.open('https://ntfy.sh/'+PHONE_ALERT_TOPIC,'_blank');const s=document.getElementById('phoneStatus');s.innerHTML='<span class="text-emerald-400">● PHONE TOPIC OPENED</span>';showNotification('📱 PHONE ALERT BRIDGE','Subscribe to the opened ntfy topic once on your phone.');}
+async function sendPhonePush(){const d=regionData[currentRegion],msg=document.getElementById('alertTextArea').value;try{const r=await fetch('https://ntfy.sh/'+PHONE_ALERT_TOPIC,{method:'POST',headers:{'Title':'RAKSHA AI EMERGENCY ALERT','Priority':'urgent','Tags':'rotating_light,siren'},body:`SECTOR: ${d.badge}\n\n${msg}\n\nRAKSHA AI • Prototype alert bridge`});if(!r.ok)throw new Error('push failed');document.getElementById('phoneStatus').innerHTML='<span class="text-emerald-400">● PHONE PUSH SENT</span>';showNotification('📱 PHONE PUSH SENT','Alert posted to the subscribed ntfy topic.');}catch(e){document.getElementById('phoneStatus').innerHTML='<span class="text-amber-300">● SUBSCRIBE / CONNECT FIRST</span>';showNotification('⚠ PHONE PUSH UNAVAILABLE','Local siren still works. Subscribe to the ntfy topic on the phone first.');}}
+function broadcastAlert(){const button=document.getElementById('broadcastButton');manualSirenActive=true;startSiren();sendPhonePush();button.innerHTML='<i data-lucide="volume-2" class="w-4 h-4"></i> SIREN ACTIVE — ALERT BROADCASTED';button.classList.remove('bg-red-600','hover:bg-red-500');button.classList.add('bg-amber-600');lucide.createIcons();showNotification('🚨 EMERGENCY ALERT BROADCAST','Regional alert + laptop siren activated for '+regionData[currentRegion].badge);if('Notification' in window){if(Notification.permission==='granted')new Notification('🚨 RAKSHA AI EMERGENCY ALERT',{body:document.getElementById('alertTextArea').value,requireInteraction:true});else if(Notification.permission!=='denied')Notification.requestPermission().then(p=>{if(p==='granted')new Notification('🚨 RAKSHA AI EMERGENCY ALERT',{body:document.getElementById('alertTextArea').value,requireInteraction:true})})}setTimeout(()=>{manualSirenActive=false;if(!automaticSirenActive)stopSiren();button.innerHTML='<i data-lucide="radio" class="w-4 h-4"></i> BROADCAST REGIONAL ALERT';button.classList.remove('bg-amber-600');button.classList.add('bg-red-600','hover:bg-red-500');lucide.createIcons()},8000);}
+
+async function syncBackendPrediction(){
+  const d=regionData[currentRegion];
+  try{
+    const payload={rainfall_mm:d.rainfall+scenarioRainOffset,soil_moisture_pct:d.soil,population:d.population,river_level:d.river,slope_degree:d.slope};
+    const r=await fetch(BACKEND_URL+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(1800)});
+    if(!r.ok)throw new Error('prediction unavailable');
+    const out=await r.json();
+    document.getElementById('systemStatus').textContent='API + LOCAL';
+    document.getElementById('backendStatus').innerHTML='<span class="status-dot ok"></span>Backend prediction synced';
+    addActivity('BACKEND','Prediction endpoint responded • risk '+Math.round(out.risk_score)+'%');
+  }catch(e){
+    checkBackend();
+  }
+}
+
+async function checkBackend(){
+  const el=document.getElementById('backendStatus');
+  try{
+    const r=await fetch(BACKEND_URL+'/health',{signal:AbortSignal.timeout(1200)});
+    if(!r.ok)throw new Error('offline');
+    el.innerHTML='<span class="status-dot ok"></span>Backend: connected';
+    document.getElementById('systemStatus').textContent='API READY';
+  }catch(e){
+    el.innerHTML='<span class="status-dot warn"></span>Backend: optional / offline';
+    document.getElementById('systemStatus').textContent='LOCAL READY';
+  }
+}
+function showNotification(title,message){document.getElementById('notificationTitle').textContent=title;document.getElementById('notificationMessage').textContent=message;const box=document.getElementById('notification');box.classList.add('show');clearTimeout(window.__nt);window.__nt=setTimeout(()=>box.classList.remove('show'),5000);}
+
+function openReinforcementModal(citizen=false){const d=regionData[currentRegion],r=calculateRisk(d,d.rainfall+scenarioRainOffset),id='RF-'+new Date().getFullYear()+'-'+Date.now().toString().slice(-6);document.getElementById('modalTitle').textContent=citizen?'Emergency Help Request':'Reinforcement Request';document.getElementById('modalBody').innerHTML=`<div class="space-y-3 text-sm"><div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><div class="flex justify-between"><span class="text-slate-400">Request ID</span><b>${id}</b></div><div class="flex justify-between mt-2"><span class="text-slate-400">Sector</span><b>${d.name}</b></div><div class="flex justify-between mt-2"><span class="text-slate-400">Risk</span><b class="${riskClass(r)}">${r}% • ${riskLevel(r)}</b></div></div><p class="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">Prototype workflow: the request is logged locally. Call/email actions open your device apps; there is no government backend connection in this frontend-only demo.</p><div class="grid grid-cols-2 gap-2"><a href="tel:1070" onclick="logReinforcement('${id}')" class="bg-blue-600 hover:bg-blue-500 py-3 rounded-lg text-xs font-bold text-center">📞 CALL CONTROL ROOM</a><a href="mailto:controlroom@raksha-ai.demo?subject=RAKSHA%20AI%20Reinforcement%20Request%20${id}&body=Sector:%20${encodeURIComponent(d.name)}%0ARisk:%20${r}%25%0ARequest%20ID:%20${id}" onclick="logReinforcement('${id}')" class="bg-cyan-600 hover:bg-cyan-500 py-3 rounded-lg text-xs font-bold text-center">✉ EMAIL REQUEST</a></div><button onclick="closeModal();logReinforcement('${id}')" class="w-full bg-slate-700 hover:bg-slate-600 py-2.5 rounded-lg text-xs font-bold">LOG REQUEST IN ACTIVITY FEED</button></div>`;document.getElementById('modalBackdrop').style.display='flex';}
+function logReinforcement(id){showNotification('📡 REINFORCEMENT REQUEST LOGGED',`${id} • ${regionData[currentRegion].name} • ${riskLevel(calculateRisk(regionData[currentRegion]))}`);addActivity('REINFORCEMENT',`Request ${id} logged`);}
+function closeModal(){document.getElementById('modalBackdrop').style.display='none'}
+
+function dispatchResponsePackage(){const d=regionData[currentRegion],r=calculateRisk(d,d.rainfall+scenarioRainOffset);if(resourceState.ambulances<=0&&resourceState.boats<=0){showNotification('⚠ RESOURCES EXHAUSTED','No simulated vehicles remain available.');return;}if(r<40){showNotification('ℹ DISPATCH NOT REQUIRED','Risk is below the automatic dispatch threshold.');return;}resourceState.ambulances=Math.max(0,resourceState.ambulances-1);if(d.river>=3.5)resourceState.boats=Math.max(0,resourceState.boats-1);document.getElementById('ambulanceCount').textContent=resourceState.ambulances+' / 18';document.getElementById('boatCount').textContent=resourceState.boats+' / 25';document.getElementById('dispatchStatus').textContent='Package DISPATCHED • '+d.zones[0].name+' response team notified (simulation)';document.getElementById('resourceDecision').textContent='✓ Package: medical kits + rescue gear + water/fuel allocated to the highest-risk zone.';addActivity('DISPATCH',`Response package allocated to ${d.zones[0].name}`);showNotification('🚑 RESPONSE PACKAGE DISPATCHED','Frontend simulation updated resource allocation for '+d.name);}
+
+async function runAIAnalysis(){updateCommandCenter();await syncBackendPrediction();showNotification('🤖 AI ANALYSIS COMPLETE','Risk, evacuation window, feature contribution and actions recalculated without random values.');}
+function addActivity(type,text){const el=document.getElementById('incidentTimeline');const now=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});const div=document.createElement('div');div.innerHTML=`<b class="text-cyan-300">${now}</b> — <span class="text-amber-300">${type}</span> ${text}`;el.prepend(div);}
+function toggleCitizenMode(){citizenMode=!citizenMode;document.body.classList.toggle('citizen-mode',citizenMode);const label=citizenMode?'ADMIN MODE':'CITIZEN MODE';document.getElementById('headerModeButton').innerHTML=citizenMode?'<i data-lucide="layout-dashboard" class="w-4 h-4"></i> ADMIN MODE':'<i data-lucide="smartphone" class="w-4 h-4"></i> CITIZEN MODE';lucide.createIcons();showNotification(citizenMode?'📱 CITIZEN MODE':'🖥️ ADMIN MODE',citizenMode?'Only essential public safety actions are shown.':'Full command dashboard restored.');setTimeout(()=>map.invalidateSize(),100);}
+
+document.getElementById('modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if(e.ctrlKey&&e.key.toLowerCase()==='b'){e.preventDefault();broadcastAlert()}});
+
+
+/* ================= v6 ADVANCED DECISION ENGINE ================= */
+
+let advancedScenario = {rain:0, river:0, soil:0};
+let selectedRouteIndex = 0;
+let simulationRunning = false;
+
+function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
+
+function getAdvancedInputs(){
+  const d=regionData[currentRegion];
+  return {
+    rain: clamp(d.rainfall + scenarioRainOffset + advancedScenario.rain, 0, 400),
+    river: clamp(d.river + advancedScenario.river, 0, 8),
+    soil: clamp(d.soil + advancedScenario.soil, 0, 100),
+    slope: d.slope,
+    population: d.population
+  };
+}
+
+function getHazardScores(){
+  const d=regionData[currentRegion], x=getAdvancedInputs();
+
+  const flood = Math.round(clamp(
+    x.rain/200*42 +
+    x.river/5*38 +
+    x.soil/100*15 +
+    (d.elevation<700 ? 5 : 0), 1, 99));
+
+  const landslide = Math.round(clamp(
+    x.rain/200*28 +
+    x.soil/100*24 +
+    d.slope/90*40 +
+    (d.elevation>1200 ? 8 : 0), 1, 99));
+
+  const exposure = Math.round(clamp(
+    d.population/100000*55 +
+    (x.river/5)*15 +
+    (x.soil/100)*10 +
+    (d.slope/90)*20, 1, 99));
+
+  const overall = Math.round(clamp(
+    flood*.42 + landslide*.38 + exposure*.20, 1, 99));
+
+  return {flood,landslide,exposure,overall};
+}
+
+function hazardLevel(v){
+  return v>=85?'CRITICAL':v>=70?'HIGH':v>=40?'MODERATE':'LOW';
+}
+
+function hazardTone(v){
+  return v>=85?'critical':v>=70?'high':v>=40?'moderate':'low';
+}
+
+function renderHazardMatrix(){
+  const h=getHazardScores(), d=regionData[currentRegion];
+  const items=[
+    ['FLASH FLOOD',h.flood,'waves','River + rainfall interaction'],
+    ['LANDSLIDE',h.landslide,'mountain','Slope + soil saturation'],
+    ['POPULATION EXPOSURE',h.exposure,'users','People inside hazard envelope'],
+    ['OVERALL DECISION',h.overall,'shield-alert','AI operational priority']
+  ];
+  document.getElementById('hazardMatrix').innerHTML=items.map(([name,v,icon,sub])=>`
+    <div class="hazard-card ${hazardTone(v)} mini-stat">
+      <div class="flex justify-between items-start">
+        <div><span class="text-[9px] text-slate-500">${name}</span>
+        <strong class="block big-risk ${v>=85?'text-red-400':v>=70?'text-orange-400':v>=40?'text-amber-400':'text-emerald-400'}">${v}%</strong></div>
+        <i data-lucide="${icon}" class="w-5 h-5 text-slate-500"></i>
+      </div>
+      <div class="spark mt-2"><span style="width:${v}%"></span></div>
+      <div class="flex justify-between mt-2 text-[9px]"><span class="text-slate-500">${sub}</span><b>${hazardLevel(v)}</b></div>
+    </div>`).join('');
+  lucide.createIcons();
+}
+
+function renderAIExplanation(){
+  const h=getHazardScores(), d=regionData[currentRegion], x=getAdvancedInputs();
+  const drivers=[
+    ['Rainfall intensity',Math.round(x.rain/200*100),`${Math.round(x.rain)} mm scenario input`],
+    ['River pressure',Math.round(x.river/5*100),`${x.river.toFixed(1)} m simulated level`],
+    ['Soil saturation',Math.round(x.soil),`${Math.round(x.soil)}% soil moisture`],
+    ['Slope instability',Math.round(d.slope/90*100),`${d.slope}° terrain exposure`],
+    ['Population exposure',Math.round(d.population/100000*100),`${d.population.toLocaleString('en-IN')} people`]
+  ].sort((a,b)=>b[1]-a[1]);
+
+  const primary=drivers[0];
+  document.getElementById('primaryDriverBadge').textContent='DRIVER: '+primary[0].toUpperCase();
+
+  document.getElementById('aiExplanation').innerHTML=`
+    <div><span class="text-purple-300 font-bold">AI DECISION:</span>
+      ${h.overall>=85?'Immediate protective action is recommended.':
+        h.overall>=70?'Prepare evacuation and move response resources closer.':
+        h.overall>=40?'Maintain enhanced monitoring and standby resources.':
+        'Continue routine monitoring.'}</div>
+    <div class="pt-2 border-t border-purple-500/10">
+      <b class="text-white">Primary driver:</b> ${primary[0]} (${primary[1]}%)
+      <span class="text-slate-500"> — ${primary[2]}</span>
+    </div>
+    <div class="pt-2 border-t border-purple-500/10 text-slate-400">
+      Flood ${h.flood}% + Landslide ${h.landslide}% + Exposure ${h.exposure}% → 
+      <b class="text-white">Overall ${h.overall}%</b>
+    </div>
+    <div class="text-[9px] text-amber-300 pt-1">Prototype decision engine — not a certified emergency warning.</div>
+  `;
+
+  document.getElementById('decisionSnapshot').innerHTML=`
+    <div class="flex justify-between"><span>Sector</span><b>${d.name}</b></div>
+    <div class="flex justify-between"><span>Primary hazard</span><b>${h.flood>=h.landslide?'Flood':'Landslide'}</b></div>
+    <div class="flex justify-between"><span>Recommended state</span><b>${h.overall>=85?'EVACUATE':h.overall>=70?'PREPARE':'MONITOR'}</b></div>
+    <div class="flex justify-between"><span>Evacuation window</span><b>${getEvacWindow(h.overall)} min</b></div>
+  `;
+}
+
+function updateAdvancedScenario(){
+  advancedScenario.rain=Number(document.getElementById('scenarioRainSlider').value);
+  advancedScenario.river=Number(document.getElementById('scenarioRiverSlider').value)/10;
+  advancedScenario.soil=Number(document.getElementById('scenarioSoilSlider').value);
+
+  const h=getHazardScores();
+  const base=calculateRisk(regionData[currentRegion],regionData[currentRegion].rainfall+scenarioRainOffset);
+  const projected=h.overall;
+  const delta=projected-base;
+
+  document.getElementById('scenarioRainValue').textContent=(advancedScenario.rain>=0?'+':'')+advancedScenario.rain+' mm';
+  document.getElementById('scenarioRiverValue').textContent=(advancedScenario.river>=0?'+':'')+advancedScenario.river.toFixed(1)+' m';
+  document.getElementById('scenarioSoilValue').textContent=(advancedScenario.soil>=0?'+':'')+advancedScenario.soil+'%';
+  document.getElementById('scenarioCurrentRisk').textContent=base+'%';
+  document.getElementById('scenarioProjectedRisk').textContent=projected+'%';
+  document.getElementById('scenarioDelta').textContent=(delta>=0?'+':'')+delta;
+  document.getElementById('scenarioEvac').textContent=getEvacWindow(projected)+'m';
+
+  const badge=document.getElementById('scenarioSeverity');
+  badge.textContent=projected>=85?'CRITICAL SCENARIO':projected>=70?'HIGH-RISK SCENARIO':projected>=40?'ELEVATED SCENARIO':'BASELINE';
+  badge.className='decision-pill '+(projected>=85?'text-red-300':projected>=70?'text-orange-300':projected>=40?'text-amber-300':'text-emerald-300');
+
+  document.getElementById('scenarioWarning').innerHTML=
+    projected>=85 ? '🚨 <b>THRESHOLD CROSSED:</b> Immediate evacuation planning + response dispatch recommended.' :
+    projected>=70 ? '⚠️ <b>HIGH-RISK PROJECTION:</b> Pre-position rescue teams and issue precautionary warning.' :
+    projected>=40 ? '🟡 <b>MONITOR:</b> Keep resources on standby and watch river/rainfall trend.' :
+    '🟢 <b>STABLE:</b> No additional response package recommended under this scenario.';
+
+  renderHazardMatrix();
+  renderAIExplanation();
+  renderRouteOptions();
+}
+
+function buildRouteOptions(){
+  const d=regionData[currentRegion];
+  const baseRisk=HAZARD_META[currentRegion].routeRisk;
+  const baseEta=parseInt(d.eta)||18;
+  const baseDist=parseFloat(d.distance)||6;
+  return [
+    {name:'GREEN CORRIDOR',dist:baseDist,eta:baseEta,risk:'LOW',exposure:18,reason:'Best safety-to-time balance'},
+    {name:'ALTITUDE ROUTE',dist:baseDist+1.6,eta:baseEta+5,risk:'VERY LOW',exposure:9,reason:'Maximum terrain separation'},
+    {name:'FASTEST ROUTE',dist:Math.max(3,baseDist-1.1),eta:Math.max(10,baseEta-4),risk:baseRisk,exposure:46,reason:'Fastest, but higher hazard exposure'}
+  ];
+}
+
+function renderRouteOptions(){
+  const routes=buildRouteOptions();
+  selectedRouteIndex=Math.min(selectedRouteIndex,routes.length-1);
+  document.getElementById('routeOptions').innerHTML=routes.map((r,i)=>`
+    <div class="route-option mini-stat ${i===selectedRouteIndex?'selected':''}" onclick="selectRoute(${i})">
+      <div class="flex justify-between items-center">
+        <b class="text-[10px]">${r.name}</b>
+        <span class="decision-pill ${r.risk==='LOW'||r.risk==='VERY LOW'?'text-emerald-300':'text-amber-300'}">${r.risk}</span>
+      </div>
+      <div class="grid grid-cols-3 gap-2 mt-3 text-[10px]">
+        <div><span class="text-slate-500 block">Distance</span><b>${r.dist.toFixed(1)} km</b></div>
+        <div><span class="text-slate-500 block">ETA</span><b>${r.eta} min</b></div>
+        <div><span class="text-slate-500 block">Exposure</span><b>${r.exposure}%</b></div>
+      </div>
+      <p class="text-[9px] text-slate-500 mt-2">${r.reason}</p>
+    </div>`).join('');
+  const best=routes.reduce((a,b)=>a.exposure<b.exposure?a:b);
+  document.getElementById('routeDecision').innerHTML=
+    `🟢 <b>AI RECOMMENDATION:</b> ${best.name} — saves hazard exposure by prioritizing safety.
+     Trade-off: ${best.eta} min ETA / ${best.dist.toFixed(1)} km. Routes are simulated prototype corridors.`;
+}
+
+function selectRoute(i){
+  selectedRouteIndex=i;
+  renderRouteOptions();
+  showRouteOnMap();
+  showNotification('🛣️ ROUTE SELECTED',buildRouteOptions()[i].name+' selected for simulated evacuation.');
+}
+
+async function runEmergencySimulation(){
+  if(simulationRunning)return;
+  simulationRunning=true;
+  document.getElementById('simulationStatus').textContent='RUNNING…';
+  document.getElementById('simulationOutput').innerHTML='Initializing emergency decision loop…';
+
+  const steps=[...document.querySelectorAll('.sim-step')];
+  steps.forEach(s=>s.classList.remove('active','done'));
+
+  const messages=[
+    'Sensor fusion: rainfall, soil, river and terrain signals ingested.',
+    'AI engine: multi-hazard risk scores calculated and primary threat identified.',
+    'Decision engine: vulnerable zones ranked by operational priority.',
+    'Response planner: shelter, route and simulated fleet allocation prepared.',
+    'Protection layer: multilingual citizen alert + safe route recommendation ready.'
+  ];
+
+  for(let i=0;i<steps.length;i++){
+    steps[i].classList.add('active');
+    document.getElementById('simulationOutput').innerHTML=
+      `<span class="text-purple-300 font-bold">STEP ${i+1}/5</span> — ${messages[i]}`;
+    await new Promise(r=>setTimeout(r,650));
+    steps[i].classList.remove('active');
+    steps[i].classList.add('done');
+  }
+
+  const h=getHazardScores(), d=regionData[currentRegion];
+  document.getElementById('simulationStatus').textContent='COMPLETE';
+  document.getElementById('simulationStatus').className='decision-pill text-emerald-300';
+  document.getElementById('simulationOutput').innerHTML=
+    `✅ <b class="text-emerald-300">RESPONSE PLAN READY</b> —
+     ${d.name}: Overall ${h.overall}% • Flood ${h.flood}% • Landslide ${h.landslide}% •
+     Evacuation window ${getEvacWindow(h.overall)} min.
+     <span class="text-slate-500">All response actions remain prototype/simulation workflows.</span>`;
+  addActivity('SIMULATION','End-to-end emergency response loop completed');
+  simulationRunning=false;
+}
+
+function renderAdvancedModules(){
+  renderHazardMatrix();
+  renderAIExplanation();
+  updateAdvancedScenario();
+  renderRouteOptions();
+}
+
+
+/* ================= LIVE PUBLIC DATA LAYER =================
+   Weather/soil: Open-Meteo forecast API
+   Air quality: Open-Meteo Air Quality API (CAMS)
+   The app never labels unavailable local river/rescue feeds as live. */
+let liveFetchToken=0;
+function setLiveText(id,value){const el=document.getElementById(id);if(el)el.textContent=value;}
+function fmt(v,d=0){return Number.isFinite(Number(v))?Number(v).toFixed(d):'--';}
+async function refreshLiveAreaData(){
+  const token=++liveFetchToken;
+  const d=regionData[currentRegion], [lat,lon]=d.coords;
+  setLiveText('liveFeedStatus','● UPDATING…');
+  const weatherURL=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,rain,cloud_cover,wind_speed_10m,wind_gusts_10m,pressure_msl&hourly=precipitation,soil_moisture_0_to_7cm&past_hours=24&forecast_hours=1&timezone=auto`;
+  const airURL=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=pm2_5,pm10,us_aqi&timezone=auto`;
+  try{
+    const [wr,ar]=await Promise.all([fetch(weatherURL),fetch(airURL)]);
+    if(!wr.ok) throw new Error('Weather feed unavailable');
+    const w=await wr.json();
+    const a=ar.ok?await ar.json():null;
+    if(token!==liveFetchToken) return;
+    const c=w.current||{}, h=w.hourly||{};
+    const p=(h.precipitation||[]).slice(-24).map(Number).filter(Number.isFinite);
+    const rain24=p.reduce((sum,x)=>sum+x,0);
+    const sm=(h.soil_moisture_0_to_7cm||[]).map(Number).filter(Number.isFinite);
+    const soilVol=sm.length?sm[sm.length-1]:NaN;
+    const soilPct=Number.isFinite(soilVol)?Math.max(0,Math.min(100,soilVol*100)):NaN;
+
+    setLiveText('liveTemp',`${fmt(c.temperature_2m,1)} °C`);
+    setLiveText('liveHumidity',`${fmt(c.relative_humidity_2m)}%`);
+    setLiveText('liveRain24',`${fmt(rain24,1)} mm`);
+    setLiveText('liveWind',`${fmt(c.wind_speed_10m,1)} km/h`);
+    setLiveText('liveCloud',`${fmt(c.cloud_cover)}%`);
+    setLiveText('liveSoil',Number.isFinite(soilPct)?`${fmt(soilPct,1)}% vol.`:'--');
+    setLiveText('livePM25',a?.current?.pm2_5!=null?`${fmt(a.current.pm2_5,1)} µg/m³`:'--');
+    setLiveText('liveAQI',a?.current?.us_aqi!=null?fmt(a.current.us_aqi):'--');
+    setLiveText('liveFeedStatus','● LIVE');
+    const stamp=c.time?new Date(c.time).toLocaleString([], {dateStyle:'medium',timeStyle:'short'}):new Date().toLocaleString();
+    setLiveText('liveUpdatedAt',`Updated ${stamp}`);
+
+    // Feed genuine public measurements/model estimates into the existing risk UI.
+    // 24 h precipitation replaces the former prototype rainfall value.
+    if(Number.isFinite(rain24)) d.rainfall=Math.round(rain24*10)/10;
+    if(Number.isFinite(soilPct)) d.soil=Math.round(soilPct*10)/10;
+    d.live={temperature:c.temperature_2m,humidity:c.relative_humidity_2m,rain24,wind:c.wind_speed_10m,cloud:c.cloud_cover,soilPct,pm25:a?.current?.pm2_5,aqi:a?.current?.us_aqi,time:c.time};
+
+    // River data is not invented: keep prototype field isolated from live feed.
+    d.surgeText=`Current public feed: ${fmt(rain24,1)} mm precipitation in the last 24 h, ${fmt(c.wind_speed_10m,1)} km/h wind. Live local river-gauge API is not connected for this sector.`;
+    document.getElementById('riverSurgeText').textContent=d.surgeText;
+    updateCommandCenter(); buildGraph(); renderAdvancedModules();
+    showNotification('🌐 LIVE DATA UPDATED',`${d.name}: weather and air-quality feeds refreshed.`);
+  }catch(err){
+    if(token!==liveFetchToken) return;
+    setLiveText('liveFeedStatus','● LIVE FEED ERROR');
+    setLiveText('liveUpdatedAt','Using prototype fallback values');
+    console.warn('Live feed error',err);
+  }
+}
+setInterval(()=>refreshLiveAreaData(),10*60*1000);
+
+/* Extend the existing region-change workflow without replacing the original function. */
+const __originalChangeRegion = changeRegion;
+changeRegion = function(){
+  __originalChangeRegion();
+  advancedScenario={rain:0,river:0,soil:0};
+  document.getElementById('scenarioRainSlider').value=0;
+  document.getElementById('scenarioRiverSlider').value=0;
+  document.getElementById('scenarioSoilSlider').value=0;
+  selectedRouteIndex=0;
+  renderAdvancedModules();
+  refreshLiveAreaData();
+};
+
+
+/* ================= USER LOGIN / SESSION ================= */
+let selectedLoginRole='admin';
+const RAKSHA_USERS={
+  admin:{password:'raksha123',role:'admin',name:'Emergency Administrator'},
+  citizen:{password:'citizen123',role:'citizen',name:'Citizen User'}
+};
+function selectLoginRole(role){
+  selectedLoginRole=role;
+  document.getElementById('roleAdmin').classList.toggle('active',role==='admin');
+  document.getElementById('roleCitizen').classList.toggle('active',role==='citizen');
+  document.getElementById('loginError').style.display='none';
+}
+function handleRakshaLogin(e){
+  e.preventDefault();
+  const username=document.getElementById('loginUsername').value.trim().toLowerCase();
+  const password=document.getElementById('loginPassword').value;
+  const user=RAKSHA_USERS[username];
+  if(!user || user.password!==password || user.role!==selectedLoginRole){
+    const err=document.getElementById('loginError');
+    err.textContent='Invalid username, password, or selected access role.';
+    err.style.display='block';
+    return;
+  }
+  localStorage.setItem('rakshaSession',JSON.stringify({username,role:user.role,name:user.name,loginAt:new Date().toISOString()}));
+  enterRakshaApp({username,role:user.role,name:user.name});
+}
+function enterRakshaApp(session){
+  document.body.classList.remove('auth-locked');
+  const screen=document.getElementById('loginScreen');
+  if(screen)screen.style.display='none';
+  applyRakshaRole(session.role);
+  addUserSessionControls(session);
+  if(typeof lucide!=='undefined')lucide.createIcons();
+}
+function applyRakshaRole(role){
+  document.body.classList.toggle('citizen-mode',role==='citizen');
+  const modeBtn=document.getElementById('headerModeButton');
+  if(modeBtn && role==='citizen'){modeBtn.innerHTML='<i data-lucide="shield" class="w-4 h-4"></i> ADMIN MODE';}
+}
+function addUserSessionControls(session){
+  const holder=document.querySelector('header > .flex.items-center.gap-3.flex-wrap');
+  if(!holder || document.getElementById('loginUserBadge'))return;
+  const wrap=document.createElement('div');
+  wrap.id='loginUserBadge';
+  wrap.innerHTML=`<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-[10px] text-slate-300">${session.name}</span><span class="text-[9px] text-cyan-300 uppercase">${session.role}</span><button id="logoutButton" onclick="rakshaLogout()">LOG OUT</button>`;
+  holder.appendChild(wrap);
+}
+function rakshaLogout(){
+  localStorage.removeItem('rakshaSession');
+  location.reload();
+}
+function restoreRakshaSession(){
+  try{
+    const session=JSON.parse(localStorage.getItem('rakshaSession')||'null');
+    if(session && RAKSHA_USERS[session.username] && RAKSHA_USERS[session.username].role===session.role)enterRakshaApp(session);
+  }catch(e){localStorage.removeItem('rakshaSession');}
+}
+
+populateRegions();initMap();initChart();document.getElementById('alertTextArea').value=languageMessages.en;changeRegion();checkBackend();restoreRakshaSession();
+
+/* AUTO RISK WATCHDOG
+   Re-check selected region every 2 seconds.
+   Risk >=70% automatically activates the siren. */
+setInterval(()=>{
+  try{
+    const d=regionData[currentRegion];
+    const r=calculateRisk(d,d.rainfall+scenarioRainOffset);
+    checkAutomaticEarlyWarning(r,d);
+  }catch(e){}
+},2000);
+</script>
+</body>
+</html>
