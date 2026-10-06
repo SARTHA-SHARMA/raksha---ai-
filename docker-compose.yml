@@ -1,0 +1,13 @@
+services:
+  raksha-ai:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      CORS_ORIGINS: "*"
+      PORT: "8000"
+    volumes:
+      - raksha_data:/app/backend/data
+
+volumes:
+  raksha_data:

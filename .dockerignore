@@ -1,0 +1,6 @@
+__pycache__
+*.pyc
+.venv
+backend/raksha.db
+.git
+.gitignore
